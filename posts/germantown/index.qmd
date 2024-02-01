@@ -7,8 +7,7 @@ categories: [planning, book]
 
 ***If want to see the complete version of our planning, please check the [link](https://online.fliphtml5.com/paeqb/antv/) and see the full planning book.***
 
-The 'Germantown Equity Strategic Planning' is the outcome of CPLN 600 under the guidance of Lauren Parker. In the 4 months study and research, our team achieved comprenhensive understanding of Germantown and promted Equity Strategic Planning for the Germantown's next 10 years development. 
+# Introduction 
+Located in Northwest Philadelphia, Germantown is a culturally vibrant, historic neighborhood with over 50,000 residents calling the neighborhood home. Germantown’s borders are roughly bounded by Wissahickon Ave. to the west, Johnson & Washington Streets to the north, Stenton Ave. to east, Wister Street to the southwest, and Roberts Ave to the south. Originally an independent township established in the 1680s by German-Dutch settlers, Germantown was incorporated into Philadelphia almost 170 years ago in 1854. Today, the residential neighborhood has retained its character, with its namesake Avenue being a vital component of Germantown’s distinct identity. However, with increasing development occurring in the neighborhood, Germantown is at several crossroads after being affected by decades of disinvestment, population decline, high crime, and economic downturns.
 
-![](thumbnail.jpg)
-
-Since this post doesn't specify an explicit `image`, the first image in the post will be used in the listing page of posts.
+![](WechatIMG114.jpg)
