@@ -1,0 +1,560 @@
+---
+title: "MUSA508_TOD Development -- Washington DC for example"
+author: "Tianxiao Chen"
+date: "2023-09-10"
+output:
+  html_document:
+    code-fold: true
+    code-summary: "Show the code"
+---
+
+# Data wrangling
+
+Washington DC has a mature rail transit system, which provides the city with highly possibility of TOD development. Therefore, we take Washington DC as our analysis site to explore the current situation of region surrounding station and if DC has potential for TOD development in the future. 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(tidycensus.progress = FALSE)
+```
+```{r load package, warning = FALSE, message = FALSE} 
+library(tidycensus)
+library(tidyverse)
+library(ggplot2)
+library(sf)
+library(kableExtra)
+
+options(scipen=999)
+options(tigris_class = "sf")
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
+palette5 <- c("#f0f9e8","#bae4bc","#7bccc4","#43a2ca","#0868ac")
+```
+
+```{r new label variable function, cache = TRUE, warning = FALSE, message = FALSE}
+newqBr <- function(df, variable, rnd) {
+  if (missing(rnd)) {
+    as.character(quantile(round(df[[variable]],4),
+                          c(.01,.2,.4,.6,.8), na.rm=T))
+  } else if (rnd == FALSE | rnd == F) {
+    as.character(formatC(quantile(df[[variable]],
+                                  c(.01,.2,.4,.6,.8), na.rm=T),
+                         digits = 3))
+  }
+}
+```
+
+## Social and Economic Dataset
+To make further analysis, we select some of the variables, including population, median rent, median household income and etc, and use the ACS-5 data in 2009 and 2019 as our raw data source. Besides basic variable, we create new varialbes like percentage of Bachelors or more and percentage of white to have more comprehensive analysis.
+
+```{r load_variables, cache = TRUE, warning = FALSE, message = FALSE}
+acs_variable_list.2019 <- load_variables(2019, #year
+                                         "acs5", #five year ACS estimates
+                                         cache = TRUE)
+
+acs_variable_list.2009 <- load_variables(2009, #year
+                                         "acs5", #five year ACS estimates
+                                         cache = TRUE)
+```
+
+```{r variables need to include, cache = TRUE, warning = FALSE,error = FALSE, message = FALSE, result = 'hide'}
+tracts19 <-  
+  get_acs(geography = "tract",
+          variables = c("B25026_001E","B02001_002E",
+                        "B15001_050E","B15001_009E",
+                        "B19013_001E", "B25058_001E",
+                        "B06012_002E"), 
+          year=2019, state=11,
+          geometry=TRUE) %>% 
+  st_transform('ESRI:102728')
+```
+
+```{r load 2019 tract data, cache = TRUE, warning = FALSE, message = FALSE, result = 'hide'}
+tracts19 <- 
+  tracts19 %>%
+  dplyr::select( -NAME, -moe) %>%
+  spread(key = variable, value = estimate) %>%
+  rename(TotalPop = B25026_001, 
+         Whites = B02001_002,
+         FemaleBachelors = B15001_050, 
+         MaleBachelors = B15001_009,
+         MedHHInc = B19013_001, 
+         MedRent = B25058_001,
+         TotalPoverty = B06012_002)
+
+tracts19 <- 
+  tracts19 %>%
+  mutate(pctWhite = ifelse(TotalPop > 0, Whites / TotalPop, 0),
+         pctBachelors = ifelse(TotalPop > 0, ((FemaleBachelors + MaleBachelors) / TotalPop), 0),
+         pctPoverty = ifelse(TotalPop > 0, TotalPoverty / TotalPop, 0),
+         year = "2019") %>%
+  dplyr::select(-Whites,-FemaleBachelors,-MaleBachelors,-TotalPoverty)
+```
+
+```{r load 2009 tract data, cache = TRUE, warning = FALSE, message = FALSE, result = 'hide'}
+tracts09 <- 
+  get_acs(geography = "tract", 
+          variables = c("B25026_001E","B02001_002E",
+                        "B15001_050E","B15001_009E",
+                        "B19013_001E","B25058_001E",
+                        "B06012_002E"), 
+          year=2009, state=11, 
+          geometry=TRUE, output="wide") %>%
+  st_transform('ESRI:102728') %>%
+  rename(TotalPop = B25026_001E, 
+         Whites = B02001_002E,
+         FemaleBachelors = B15001_050E, 
+         MaleBachelors = B15001_009E,
+         MedHHInc = B19013_001E, 
+         MedRent = B25058_001E,
+         TotalPoverty = B06012_002E) %>%
+  dplyr::select(-NAME, -starts_with("B")) %>%
+  mutate(pctWhite = ifelse(TotalPop > 0, Whites / TotalPop,0),
+         pctBachelors = ifelse(TotalPop > 0, ((FemaleBachelors + MaleBachelors) / TotalPop),0),
+         pctPoverty = ifelse(TotalPop > 0, TotalPoverty / TotalPop, 0),
+         year = "2009") %>%
+  dplyr::select(-Whites, -FemaleBachelors, -MaleBachelors, -TotalPoverty) 
+```
+
+```{r combine tract dataset, cache = TRUE, warning = FALSE, message = FALSE}
+allTracts <- rbind(tracts19,tracts09)
+```
+
+To understand if the station has indication to the public safety, we also collect crime dataset from DC gov website to join the existing social and economic dataset.
+
+```{r crimedata, cache = TRUE, warning = FALSE, message = FALSE, result = 'hide'}
+crime19 <- st_read("https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/1/query?outFields=*&where=1%3D1&f=geojson") %>%
+  dplyr::select(OFFENSE, CENSUS_TRACT, OBJECTID) %>%
+  st_transform('ESRI:102728')  
+
+crime09 <- st_read("https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/33/query?outFields=*&where=1%3D1&f=geojson") %>%
+  dplyr::select(OFFENSE, CENSUS_TRACT, OBJECTID) %>%
+  st_transform('ESRI:102728') 
+  
+```
+
+```{r crime_data_09_19, cache = TRUE, warning = FALSE, message = FALSE}
+crime_counts_by_tract_19 <- allTracts %>%
+  st_intersection(crime19) %>%
+  group_by(GEOID) %>%
+  summarise(crime_counts=n()) %>%
+  st_drop_geometry() %>%
+  mutate(year="2019")
+
+crime_counts_by_tract_09 <- allTracts %>%
+  st_intersection(crime09) %>%
+  group_by(GEOID) %>%
+  summarise(crime_counts=n()) %>%
+  st_drop_geometry() %>%
+  mutate(year="2009")
+
+crime_counts_all <- rbind(crime_counts_by_tract_09, crime_counts_by_tract_19)
+allTracts <- left_join(allTracts, crime_counts_all, by=c("GEOID"="GEOID", "year"="year"))
+```
+
+## Station dataset
+Due to Washington DC has mature and widespread metro system, we select DC's metro station data, which is also from DC gov website, as our transportation element in the TOD analysis.
+```{r load station data, cache = TRUE, warning = FALSE, message = FALSE, result = 'hide'}
+dc_station <- st_read("https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_Rail_Bus_WebMercator/MapServer/52/query?where=1%3D1&outFields=*&outSR=4326&f=json") %>%
+  dplyr::select(NAME,LINE) %>%
+  st_transform('ESRI:102728')  
+dc_line <- st_read('https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_Rail_Bus_WebMercator/MapServer/106/query?outFields=*&where=1%3D1&f=geojson') %>%
+  dplyr::select(NAME,GIS_ID)%>%
+  st_transform('ESRI:102728')
+```
+
+From the map of station and line distribution, we can find that the stations mainly locate in the north part of DC, diffusing from the center. The lines build a continous connection from the north-west to south-east, while having some connections from north to the central part of DC.
+
+```{r visualization station, cache = TRUE, warning = FALSE, message = FALSE}
+ggplot() +
+  geom_sf(data = st_union(tracts19)) +
+  geom_sf(data = dc_station,
+          aes(color = LINE),
+          show.legend = 'Point',size=2) +
+  geom_sf(data = dc_line,
+          aes(color = GIS_ID),
+          show.legend = 'Line',size=1)
+  labs(title = 'Station stops',
+       subtitle = 'Washington DC',
+       caption = 'Figure 1,1')+
+  scale_color_manual(values = c("blue","green","orange","red","#C0C0C0","yellow"),name="Metro Line")
+```
+
+# Definition of TOD region
+To explore the influence of TOD, we need to clarify the range of TOD region. First of all, we set 0.5 miles, 15 minutes walking distance, from station as the range in the influence of TOD. Secondly, we choose three different methods to define the range of tracts in TOD region, composed of the range in the 0.5 mile's buffer, the tracts which centroid point is in the 0.5 mile's buffer, and the tracts that have intersection with 0.5 mile's buffer.
+
+```{r station buffer dataset, cache = TRUE, warning = FALSE, message = FALSE}
+station_buffer<- rbind(
+  st_buffer(dc_station,2640) %>%
+    mutate(Legend = 'buffer')%>%
+    dplyr::select(Legend),
+  st_union(st_buffer(dc_station,2640))%>%
+    st_sf()%>%
+    mutate(Legend = 'Unioned Buffer')
+)
+```
+
+```{r station buffer range, cache = TRUE, warning = FALSE, message = FALSE}
+ggplot() +
+  geom_sf(data = station_buffer) +
+  geom_sf(data = dc_station,
+          show.legend = 'Point',size = 2) +
+  facet_wrap(~Legend) + 
+  labs(title = 'Station 0.5 miles buffer',
+       caption = 'Figure 1.2')+
+  mapTheme()
+```
+
+```{r get the union buffer dataset, cache = TRUE, warning = FALSE, message = FALSE}
+buffer <- filter(station_buffer, Legend=='Unioned Buffer')
+```
+
+```{r selection-1, warning = FALSE, message = FALSE}
+clip <- st_intersection(buffer,tracts19) %>%
+  dplyr::select(TotalPop)%>%
+  mutate(inter_type = 'Clip')
+```
+
+```{r selection-2, cache = TRUE, warning = FALSE, message = FALSE}
+selection <- tracts19[buffer,]%>%
+  select(TotalPop)%>%
+  mutate(inter_type = 'Spatial Selection')
+```
+
+```{r selection-3, cache = TRUE, warning = FALSE, message = FALSE}
+select_centroid <- st_centroid(tracts19)[buffer,] %>%
+  st_drop_geometry() %>%
+  left_join(., dplyr::select(tracts19, GEOID), by = "GEOID") %>%
+  st_sf() %>%
+  dplyr::select(TotalPop) %>%
+  mutate(inter_type = "Centroids")
+```
+
+After the visualization of three different definition method, we can easily find that the third way includes much more tracts' area especially some large tracts and excessive inclusion due to irregular boundary shapes. Comparing the first and second method, despite the second method has the most precise boundry of TOD range, the unit of data is tract make such method have more problem in data representing.
+
+```{r selection visualize and compare, cache = TRUE, warning = FALSE, message = FALSE}
+intersections <- rbind(clip, selection, select_centroid)
+
+ggplot() +
+  geom_sf(data=intersections, aes(fill = TotalPop)) +
+  geom_sf(data=dc_station, show.legend = "point") +
+  scale_fill_viridis_c() +
+  facet_wrap(~inter_type) + 
+  labs(title = '3 different TOD range selection methods comaparison',
+       caption = 'Figure 1.3')+
+  mapTheme()
+```
+
+if we use the second method to define TOD area and use the tract, whose GEOID is not in the set of tracts in TOD area, we can find that large part of tracts get lost in the map. The situation results from the same dilemma as the third method to define TOD region. the tract information in such small area could not represent the whole tract, especially estimating the influence of TOD. As a result, we select the first approach as our way to define TOD region. 
+However, we still need to acknowledge the limitation of less consideration of tract that in a close distance to TOD but have not direct intersection to 0.5 miles' buffer in the first method. 
+
+```{r final selection of centroids, cache = TRUE, warning = FALSE, message = FALSE}
+tod_part <- st_intersection(buffer,allTracts)%>%
+  mutate(TOD = 'TOD')%>%
+  dplyr::select(-Legend)
+
+non_tod_part <- allTracts %>%
+  filter(!(GEOID %in% tod_part$GEOID))%>%
+  mutate(TOD = 'Non_TOD')
+
+ggplot() +
+  geom_sf(data = non_tod_part,aes(fill = TotalPop))+
+  geom_sf(data = tod_part,aes(fill = TotalPop))+
+  labs(title = 'Drawback of clip method to define TOD',
+       caption = 'Figure 1.4')+
+  mapTheme()
+```
+
+# TOD analysis
+## TOD dataset create
+Based on the selected defining method, we set TOD label for ACS-5 dataset. Considering the inflation, we make inflation adjustment on the median rent and median household income in the dataset for better comparison.
+```{r TOD label set, cache = TRUE, warning = FALSE, message = FALSE}
+allTracts.group <- 
+  rbind(
+    st_centroid(allTracts)[buffer,] %>%
+      st_drop_geometry() %>%
+      left_join(allTracts) %>%
+      st_sf() %>%
+      mutate(TOD = "TOD"),
+    st_centroid(allTracts)[buffer, op = st_disjoint] %>%
+      st_drop_geometry() %>%
+      left_join(allTracts) %>%
+      st_sf() %>%
+      mutate(TOD = "Non-TOD")) %>%
+  mutate(MedRent.inf = ifelse(year == "2009", MedRent * 1.19, MedRent))%>%
+  mutate(MedHHInc.inf = ifelse(year == "2009", MedHHInc *1.19, MedHHInc)) 
+```
+
+```{r get tracrts centroid dataset, cache = TRUE, warning = FALSE, message = FALSE}
+centroid_all <- st_centroid(allTracts.group, of_largest_polygon = TRUE)
+```
+Meanwhile, we filter the part with 'TOD' label in dataset for further deeper analysis in the TOD region.
+```{r area of TOD, cache = TRUE, warning = FALSE, message = FALSE}
+Tod_region <- allTracts.group %>%
+  select(TOD) %>%
+  filter(TOD =="TOD") %>%
+  st_union() %>%
+  st_sf()
+```
+
+## Social and economic analysis based on TOD
+Before discussing the impacts of railway station to surrounding tracts, we figure out the difference of TOD region between 2009 and 2019. We can find that the most tracts in 2019 kept the same as 2009, except few tracts was excluded due to tracts' re-split. Overall, the TOD region kept the same from 2009 to 2019. 
+```{r TOD space time compare, cache = TRUE, warning = FALSE, message = FALSE}
+ggplot(allTracts.group)+
+  geom_sf(data = st_union(tracts19))+
+  geom_sf(aes(fill = TOD))+
+  scale_fill_manual(values = c("grey", "yellow"))+
+  labs(title = "TOD and Non-TOD Census Tracts in Washington DC",
+       caption = "Figure 2.1")+
+  facet_wrap(~year)+
+  mapTheme()
+```
+From the map of population distribution, we can find that DC has more population in 2019 in general. Besides the north-west and south part, the north-east part had trend to become another populations agglomeration. However,there's not obvious difference in the population change in the TOD area.
+```{r population change, cache = TRUE, warning = FALSE, message = FALSE}
+#Total Population within the TOD & Non-TOD tracts from 2009 to 2019
+ggplot(allTracts.group)+
+  geom_sf(data = st_union(tracts19))+
+  geom_sf(aes(fill=q5(TotalPop)))+
+  geom_sf(data = st_union(Tod_region), color = "red",fill="transparent", size = 200)+
+  scale_fill_manual(values = palette5,
+                    labels= qBr(allTracts.group, "TotalPop"),
+                    name = "Population\n(Quintile Breaks)")+
+    labs(title = "Total Population by census tracts, 2009-2019",
+         subtitle = "Washington DC",
+       caption = "Figure 2.2")+
+  facet_wrap(~year)+
+  mapTheme()
+```
+When it comes to the median household income, we can easily find that the north-west part have a average higher income level, which kept the same situation from 2009 to 2019. Focusing on the TOD region, we can find that in the center part of TOD region had an apparent median household income increase comapred to the surrounding areas.
+```{r median household income change, cache = TRUE, warning = FALSE, message = FALSE}
+#Median household income within the TOD & Non-TOD tracts from 2009 to 2019
+ggplot(allTracts.group)+
+  geom_sf(data = st_union(tracts19))+
+  geom_sf(aes(fill=q5(MedHHInc.inf)))+
+  geom_sf(data = st_union(Tod_region), color = "red",fill="transparent", size = 9)+
+  scale_fill_manual(values = palette5,
+                    labels= qBr(allTracts.group, "MedHHInc.inf"),
+                    name = "Median Household Income($)\n(Quintile Breaks)\n(Inflation adjusted to 2019)")+
+    labs(title = "Median Household Income by census tracts, 2009-2019",
+         subtitle = "Washington DC",
+       caption = "Figure 2.3")+
+  facet_wrap(~year)+
+  mapTheme()
+```
+Compared to change in median household income, the high-education group (the group have the bachelors or higher degree) distribution had an interesting change in the decade. Compared to 2009, the high-education group gradually moved to the central part of DC from north-west part. Despite not much strong evidence showing the influence of TOD, the central part, which locates many transfer station, still had potential influence of gathering of people.
+```{r education level change, cache = TRUE, warning = FALSE, message = FALSE}
+#Percentage of bachelors within the TOD & Non-TOD tracts from 2009 to 2019
+ggplot(allTracts.group)+
+  geom_sf(data = st_union(tracts19))+
+  geom_sf(aes(fill=q5(pctBachelors)))+
+  geom_sf(data = st_union(Tod_region), color = "red",fill="transparent", size = 9)+
+  scale_fill_manual(values = palette5,
+                    labels= newqBr(allTracts.group, "pctBachelors"),
+                    name = "Percentage of Bachelors\n(Quintile Breaks)")+
+    labs(title = "Percentage of Bachelors by census tracts, 2009-2019",
+         subtitle = "Washington DC",
+       caption = "Figure 2.4")+
+  facet_wrap(~year)+
+  mapTheme()
+
+```
+The change in median rent price has a similar trend like change in median household income. In general, whole DC experienced a rent increase in the decade, with north part owning a higher median rent price. Also, the region in the influence of TOD tend to have a higehr price in 2019 comapred to 2009.
+```{r median rent changev, cache = TRUE, warning = FALSE, message = FALSE}
+#Median Rent within the TOD & Non-TOD tracts from 2009 to 2019
+ggplot(allTracts.group)+
+  geom_sf(data = st_union(tracts19))+
+  geom_sf(aes(fill=q5(MedRent.inf)))+
+  geom_sf(data = st_union(Tod_region), color = "red",fill="transparent", size = 9)+
+  scale_fill_manual(values = palette5,
+                    labels= newqBr(allTracts.group, "MedRent.inf"),
+                    name = "Median Rent($)\n(Quintile Breaks)\n(Inflation adjusted to 2019)")+
+    labs(title = "Median Rent by census tracts, 2009-2019",
+         subtitle = "Washington DC",
+       caption = "Figure 2.5")+
+  facet_wrap(~year)+
+  mapTheme()
+
+```
+Concerning public safety, we can find that crime counts had a slight increase in the decade, concentrating in the central and east part of DC. As the trasfer station located in the central part before, we can assume that the TOD could also increase the crime possibility in the radius area. 
+```{r crime change, cache = TRUE, warning = FALSE, message = FALSE}
+#Crime counts within the TOD & Non-TOD tracts from 2009 to 2019
+ggplot(allTracts.group)+
+  geom_sf(data = st_union(tracts19))+
+  geom_sf(aes(fill=q5(crime_counts)))+
+  geom_sf(data = st_union(Tod_region), color = "red",fill="transparent", size = 9)+
+  scale_fill_manual(values = palette5,
+                    labels= newqBr(allTracts.group, "crime_counts"),
+                    name = "Crime Counts\n(Quintile Breaks)")+
+    labs(title = "Crime Counts by census tracts, 2009-2019",
+         subtitle = "Washington DC",
+       caption = "Figure 2.6")+
+  facet_wrap(~year)+
+  mapTheme()
+```
+
+# Basic comparison in TOD and Non-TOD area
+Besides the brief summary and regional analysis from mapping, we create table to make more rigorous and data-driven analysis about the difference between TOD and non-TOD area.
+From the table and bar charts, when we focus on the change from 2009 to 2019, the household income, crime count, population and median rent both increased in TOD and Non-TOD region. Besides, percentage white decreased in Non-TOD region while percentage of poverty decrease in TOD region.
+
+Considering the difference in TOD and Non-TOD region, we can find a huge switch between 2009 and 2019. Compared to 2009, the TOD region in 2019 had faster crime numbers, household income, percentage of white, median rent price and population increase than Non-TOD region. Besides the percentage of poverty got lower in TOD region than that in Non-TOD, whose situation was reversed in 2009.
+
+```{r summary table, cache = TRUE, warning = FALSE, message = FALSE}
+allTracts.Summary <- 
+  st_drop_geometry(allTracts.group) %>%
+  group_by(year, TOD) %>%
+  summarize(Rent = mean(MedRent, na.rm = T),
+            Population = mean(TotalPop, na.rm = T),
+            Percent_White = mean(pctWhite, na.rm = T),
+            Percent_Bach = mean(pctBachelors, na.rm = T),
+            Percent_Poverty = mean(pctPoverty, na.rm = T),
+            HH_Income=mean(MedHHInc.inf, na.rm = T),
+            Crime_Counts=mean(crime_counts,na.rm = T))
+
+allTracts.Summary %>%
+  unite(year.TOD, year, TOD, sep = ": ", remove = T) %>%
+  gather(Variable, Value, -year.TOD) %>%
+  mutate(Value = round(Value, 2)) %>%
+  spread(year.TOD, Value) %>%
+  kable() %>%
+  kable_styling() %>%
+  footnote(general_title = "\n",
+           general = "Table 1")
+```
+
+```{r table visualization, cache = TRUE, warning = FALSE, message = FALSE}
+allTracts.Summary %>%
+  gather(Variable, Value, -year, -TOD) %>%
+  ggplot(aes(year, Value, fill = TOD)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~Variable, scales = "free", ncol=5) +
+  scale_fill_manual(values = c("#bae4bc", "#0868ac"),
+                    name = "Type") +
+  labs(title = "Indicator differences across time and space",
+       caption = 'Figure 2.7') +
+  plotTheme() + theme(legend.position="bottom",)
+```
+
+# TOD station surrounding analysis
+## station-centroid visualization
+Besides the analysis focusing on the tracts influenced by TOD, we also want to figure out the capability of different stations in gathering people and influencing social economic situation. Therefore, we select two indicators, including population and median rent price, to analyze the situation.
+
+### Population analysis
+To get the influence based on station, we use spatial join to get the tracts that in each station, and then sum up the population based on the station's name. From the map, we can find that the station in the central part of DC gathered more people than the surrounding areas. The phenomenon could result from the gathering influence of transfer station in this region. What's more, the central part also had more increase in total population than surrounding areas.
+```{r pop info in station, cache = TRUE, warning = FALSE, message = FALSE}
+buffer_new<- st_buffer(dc_station,2640)%>%
+  dplyr::select(NAME)
+
+pop_area <- st_join(buffer_new,allTracts%>%select(TotalPop,year))
+
+pop_area_sum <- pop_area%>%
+  group_by(NAME,year)%>%
+  summarise(pop = sum(TotalPop))%>%
+  st_drop_geometry()
+
+station_new <- left_join(dc_station,pop_area_sum,by='NAME')
+```
+
+```{r graduated symbol maps of population, cache = TRUE, warning = FALSE, message = FALSE}
+# population
+ggplot() +
+  geom_sf(data = allTracts.group,fill='grey40') + 
+  geom_sf(data = Tod_region, color = "white",fill="transparent", size = 1)+
+    geom_sf(data = station_new,
+          pch = 21,
+          aes(size=pop),
+          fill=alpha('red',0.7),
+          col = 'grey20') +
+  labs(title = 'Population Graduated Symbol Maps in 2009 and 2019',
+       caption = 'Figure 3.1')+
+  facet_wrap(~year) +
+  scale_size(range = c(1,5))
+```
+
+### Median Rent analysis
+Having the similar data process step with population analysis one, we can find that the whole TOD region had an obvious median rent increase. When we look at the increase trend, we can find that the center to south-east TOD part have a higher median rent price increase compared to the north-west part, which may result from the the area's 2009 median rent price were on the high side for DC.
+```{r rent info in station, cache = TRUE, warning = FALSE, message = FALSE}
+rent_area <- st_join(buffer_new,allTracts%>%select(MedRent,year))
+rent_area[is.na(rent_area)] <- 0
+
+rent_area_sum <- rent_area%>%
+  group_by(NAME,year)%>%
+  summarise(rent = mean(MedRent))%>%
+  st_drop_geometry()
+
+station_new2 <- left_join(dc_station,rent_area_sum,by='NAME')
+```
+
+```{r graduated symbol maps of median rent, cache = TRUE, warning = FALSE, message = FALSE}
+# rent
+ggplot() +
+  geom_sf(data = allTracts.group,fill='grey40') + 
+  geom_sf(data = Tod_region, color = "white",fill="transparent", size = 1)+
+    geom_sf(data = station_new2,
+          pch = 21,
+          aes(size=rent),
+          fill=alpha('red',0.7),
+          col = 'grey20') +
+    labs(title = ' Median Rent Graduated Symbol Maps in 2009 and 2019',
+       caption = 'Figure 3.2')+
+  facet_wrap(~year) +
+  scale_size(range = c(1,5))
+```
+
+## The analysis of the distance to TOD
+After the analysis for TOD radius areas, we try to make an analysis that if the distance from station have some continuous influence to social economic indicator. We make multi buffer based on the station, and then use the center point of tracts to represent the data in each tracts. Based on the points location relationship to the buffer rings, we label the distances information in each tracts dataset and make further analysis.  
+```{r create multirings of tracts, cache = TRUE, warning = FALSE, message = FALSE}
+station_ring <- multipleRingBuffer(st_union(dc_station), 2640*9, 2640)
+
+allTracts.rings <-
+  st_join(st_centroid(dplyr::select(allTracts.group, GEOID, year)),
+          station_ring) %>%
+  st_drop_geometry() %>%
+  left_join(dplyr::select(allTracts.group, GEOID, MedRent, year), 
+            by=c("GEOID"="GEOID", "year"="year")) %>%
+  st_sf() %>%
+  mutate(distance = distance / 5280)
+```
+
+```{r visualize half mile buffers, cache = TRUE, warning = FALSE, message = FALSE}
+ggplot() +
+    geom_sf(data=station_ring,aes(color=distance)) +
+  scale_color_gradient()+
+    geom_sf(data=dc_station, size=1) +
+    geom_sf(data=st_union(allTracts.rings), fill=NA, color="red",size=2) +
+    labs(title="Station Stops: Half Mile Buffers",
+         subtitle = "Washington DC",
+         caption = "Figure 3.3") +
+    mapTheme()
+```
+
+```{r Distance to stations, cache = TRUE, warning = FALSE, message = FALSE}
+ggplot(allTracts.rings)+
+  geom_sf(data = st_union(tracts19))+
+  geom_sf(aes(fill = as.factor(distance)))+
+  geom_sf(data = Tod_region, color= "#de660c",fill="transparent", size =9)+
+  scale_fill_brewer(palette = "YlGnBu",
+                      name = "Distance to Subway Stations")+
+  #distiller -> 用来做continuous palette, brewer->discrete 
+    labs(title = "Distance to Subway Stations by census tracts",
+         subtitle = "Washington DC",
+       caption = "Figure 3.4")+
+  mapTheme()
+```
+From the line chart of average median rent in different distances to station, we can find that the rent had a general increase from 2009 to 2019, which also show the same trend that the rent price gradually decrease when far from station at the beginning, and then increase to the peak when the distance comes to 2 to 2.5 miles. Due to the tract data which distance to TOD is 3.5 miles is Null and filled with 0 in data cleaning, we can still draw the conclusion from existing 2009 data that the rent will decrease again after 2.5 miles.
+```{r dataset of rent based on distance, cache = TRUE, warning = FALSE, message = FALSE}
+allTracts.rings[is.na(allTracts.rings)] <- 0
+summary <- allTracts.rings%>%
+  st_drop_geometry() %>%
+  group_by(year,distance)%>%
+  summarise(averagerent = mean(MedRent))
+```
+
+```{r rent-distance visualization, cache = TRUE, warning = FALSE, message = FALSE}
+ggplot(data=summary,aes(x=distance, y=averagerent, group=year, color=year)) +
+    geom_line() +
+    ggtitle("Average rent in differnt distance to station") +
+    ylab("Average rent")
+```
+
+# Conclusion
+Overall, we can find that TOD region had a obvious and positive influence to the economic development in DC from 2009 to 2019. TOD region have more population, median rent price, and percentage of white increase in the decade，with better improvement of poverty. However, we should not forget the development may accompany with gentrification with higher living cost and segregation.
+What's more, the stations have better chance to serve more people in the decade with population increasing surrounding TOD region. With general rent price increase in TOD area, the center to south-east region experienced a higher increase. And the rent price associated with the station distance followed the regularity that decrease first, increase to the peak when the distance comes to 2.5 miles and then decrease gradully, which support the TOD's influence to DC.
