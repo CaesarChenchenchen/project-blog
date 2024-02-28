@@ -1,7 +1,9 @@
 ---
-title: "MUSA508_TOD Development -- Washington DC for example"
+title: "TOD Development -- Washington DC for example"
 author: "Tianxiao Chen"
 date: "2023-09-10"
+categories: [transit, planning, code, analysis]
+image: "transit.jpeg"
 output:
   html_document:
     code-fold: true
@@ -11,11 +13,10 @@ output:
 # Data wrangling
 
 Washington DC has a mature rail transit system, which provides the city with highly possibility of TOD development. Therefore, we take Washington DC as our analysis site to explore the current situation of region surrounding station and if DC has potential for TOD development in the future. 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE,message=FALSE,warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-options(tidycensus.progress = FALSE)
 ```
-```{r load package, warning = FALSE, message = FALSE} 
+```{r load package,include=FALSE, warning = FALSE, message = FALSE} 
 library(tidycensus)
 library(tidyverse)
 library(ggplot2)
@@ -30,7 +31,7 @@ source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-L
 palette5 <- c("#f0f9e8","#bae4bc","#7bccc4","#43a2ca","#0868ac")
 ```
 
-```{r new label variable function, cache = TRUE, warning = FALSE, message = FALSE}
+```{r new label variable function, cache = TRUE,include=FALSE, warning = FALSE, message = FALSE}
 newqBr <- function(df, variable, rnd) {
   if (missing(rnd)) {
     as.character(quantile(round(df[[variable]],4),
