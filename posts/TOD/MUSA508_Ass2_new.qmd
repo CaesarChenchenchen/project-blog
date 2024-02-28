@@ -4,8 +4,8 @@ author: "Tianxiao Chen"
 date: "2023-09-10"
 categories: [transit, planning, code, analysis]
 image: "transit.jpeg"
-output:
-  html_document:
+format:
+  html:
     code-fold: true
     code-summary: "Show the code"
 ---

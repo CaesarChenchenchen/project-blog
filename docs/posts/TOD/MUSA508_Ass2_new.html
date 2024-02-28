@@ -193,6 +193,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h2 class="anchored" data-anchor-id="social-and-economic-dataset">Social and Economic Dataset</h2>
 <p>To make further analysis, we select some of the variables, including population, median rent, median household income and etc, and use the ACS-5 data in 2009 and 2019 as our raw data source. Besides basic variable, we create new varialbes like percentage of Bachelors or more and percentage of white to have more comprehensive analysis.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/load_variables_574564c328de1378d6bc076a39bb9843">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>acs_variable_list<span class="fl">.2019</span> <span class="ot">&lt;-</span> <span class="fu">load_variables</span>(<span class="dv">2019</span>, <span class="co">#year</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>                                         <span class="st">"acs5"</span>, <span class="co">#five year ACS estimates</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>                                         <span class="at">cache =</span> <span class="cn">TRUE</span>)</span>
@@ -200,8 +202,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>acs_variable_list<span class="fl">.2009</span> <span class="ot">&lt;-</span> <span class="fu">load_variables</span>(<span class="dv">2009</span>, <span class="co">#year</span></span>
 <span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>                                         <span class="st">"acs5"</span>, <span class="co">#five year ACS estimates</span></span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>                                         <span class="at">cache =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-result="hide" data-hash="MUSA508_Ass2_new_cache/html/variables need to include_c8479b8d6bf9903417f80d139afb161e">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>tracts19 <span class="ot">&lt;-</span>  </span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">get_acs</span>(<span class="at">geography =</span> <span class="st">"tract"</span>,</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>          <span class="at">variables =</span> <span class="fu">c</span>(<span class="st">"B25026_001E"</span>,<span class="st">"B02001_002E"</span>,</span>
@@ -211,6 +216,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>          <span class="at">year=</span><span class="dv">2019</span>, <span class="at">state=</span><span class="dv">11</span>,</span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>          <span class="at">geometry=</span><span class="cn">TRUE</span>) <span class="sc">%&gt;%</span> </span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="st">'ESRI:102728'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>
   |                                                                            
@@ -226,6 +232,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="cell" data-result="hide" data-hash="MUSA508_Ass2_new_cache/html/load 2019 tract data_4452869626f5e9123f5002a54f884b1e">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>tracts19 <span class="ot">&lt;-</span> </span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  tracts19 <span class="sc">%&gt;%</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>( <span class="sc">-</span>NAME, <span class="sc">-</span>moe) <span class="sc">%&gt;%</span></span>
@@ -245,8 +253,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>         <span class="at">pctPoverty =</span> <span class="fu">ifelse</span>(TotalPop <span class="sc">&gt;</span> <span class="dv">0</span>, TotalPoverty <span class="sc">/</span> TotalPop, <span class="dv">0</span>),</span>
 <span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>         <span class="at">year =</span> <span class="st">"2019"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>Whites,<span class="sc">-</span>FemaleBachelors,<span class="sc">-</span>MaleBachelors,<span class="sc">-</span>TotalPoverty)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-result="hide" data-hash="MUSA508_Ass2_new_cache/html/load 2009 tract data_6ad1271892a114d7b0cf5e185917027e">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>tracts09 <span class="ot">&lt;-</span> </span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">get_acs</span>(<span class="at">geography =</span> <span class="st">"tract"</span>, </span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>          <span class="at">variables =</span> <span class="fu">c</span>(<span class="st">"B25026_001E"</span>,<span class="st">"B02001_002E"</span>,</span>
@@ -269,6 +280,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>         <span class="at">pctPoverty =</span> <span class="fu">ifelse</span>(TotalPop <span class="sc">&gt;</span> <span class="dv">0</span>, TotalPoverty <span class="sc">/</span> TotalPop, <span class="dv">0</span>),</span>
 <span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>         <span class="at">year =</span> <span class="st">"2009"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>Whites, <span class="sc">-</span>FemaleBachelors, <span class="sc">-</span>MaleBachelors, <span class="sc">-</span>TotalPoverty) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>
   |                                                                            
@@ -282,13 +294,19 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/combine tract dataset_fd301179e4cb870f59575883d5912fd3">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>allTracts <span class="ot">&lt;-</span> <span class="fu">rbind</span>(tracts19,tracts09)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <p>To understand if the station has indication to the public safety, we also collect crime dataset from DC gov website to join the existing social and economic dataset.</p>
 <div class="cell" data-result="hide" data-hash="MUSA508_Ass2_new_cache/html/crimedata_e373c0670869288654bb8e94891e9d69">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>crime19 <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">"https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/1/query?outFields=*&amp;where=1%3D1&amp;f=geojson"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(OFFENSE, CENSUS_TRACT, OBJECTID) <span class="sc">%&gt;%</span></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="st">'ESRI:102728'</span>)  </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Reading layer `OGRGeoJSON' from data source 
   `https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/1/query?outFields=*&amp;where=1%3D1&amp;f=geojson' 
@@ -299,9 +317,12 @@ Dimension:     XY
 Bounding box:  xmin: -77.11414 ymin: 38.81939 xmax: -76.91002 ymax: 38.9937
 Geodetic CRS:  WGS 84</code></pre>
 </div>
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>crime09 <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">"https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/33/query?outFields=*&amp;where=1%3D1&amp;f=geojson"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(OFFENSE, CENSUS_TRACT, OBJECTID) <span class="sc">%&gt;%</span></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="st">'ESRI:102728'</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Reading layer `OGRGeoJSON' from data source 
   `https://maps2.dcgis.dc.gov/dcgis/rest/services/FEEDS/MPD/MapServer/33/query?outFields=*&amp;where=1%3D1&amp;f=geojson' 
@@ -314,6 +335,8 @@ Geodetic CRS:  WGS 84</code></pre>
 </div>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/crime_data_09_19_214b580b2040f92ea039b3568d641ef6">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>crime_counts_by_tract_19 <span class="ot">&lt;-</span> allTracts <span class="sc">%&gt;%</span></span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(crime19) <span class="sc">%&gt;%</span></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(GEOID) <span class="sc">%&gt;%</span></span>
@@ -330,15 +353,19 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>crime_counts_all <span class="ot">&lt;-</span> <span class="fu">rbind</span>(crime_counts_by_tract_09, crime_counts_by_tract_19)</span>
 <span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>allTracts <span class="ot">&lt;-</span> <span class="fu">left_join</span>(allTracts, crime_counts_all, <span class="at">by=</span><span class="fu">c</span>(<span class="st">"GEOID"</span><span class="ot">=</span><span class="st">"GEOID"</span>, <span class="st">"year"</span><span class="ot">=</span><span class="st">"year"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 </section>
 <section id="station-dataset" class="level2">
 <h2 class="anchored" data-anchor-id="station-dataset">Station dataset</h2>
 <p>Due to Washington DC has mature and widespread metro system, we select DC’s metro station data, which is also from DC gov website, as our transportation element in the TOD analysis.</p>
 <div class="cell" data-result="hide" data-hash="MUSA508_Ass2_new_cache/html/load station data_47160d14fd5c414f8525e4bb0f05efa2">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>dc_station <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">"https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_Rail_Bus_WebMercator/MapServer/52/query?where=1%3D1&amp;outFields=*&amp;outSR=4326&amp;f=json"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(NAME,LINE) <span class="sc">%&gt;%</span></span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="st">'ESRI:102728'</span>)  </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Reading layer `ESRIJSON' from data source 
   `https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_Rail_Bus_WebMercator/MapServer/52/query?where=1%3D1&amp;outFields=*&amp;outSR=4326&amp;f=json' 
@@ -349,9 +376,12 @@ Dimension:     XY
 Bounding box:  xmin: -77.085 ymin: 38.84567 xmax: -76.93526 ymax: 38.97609
 Geodetic CRS:  WGS 84</code></pre>
 </div>
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>dc_line <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">'https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_Rail_Bus_WebMercator/MapServer/106/query?outFields=*&amp;where=1%3D1&amp;f=geojson'</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(NAME,GIS_ID)<span class="sc">%&gt;%</span></span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="st">'ESRI:102728'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>Reading layer `OGRGeoJSON' from data source 
   `https://maps2.dcgis.dc.gov/dcgis/rest/services/DCGIS_DATA/Transportation_Rail_Bus_WebMercator/MapServer/106/query?outFields=*&amp;where=1%3D1&amp;f=geojson' 
@@ -365,6 +395,8 @@ Geodetic CRS:  WGS 84</code></pre>
 </div>
 <p>From the map of station and line distribution, we can find that the stations mainly locate in the north part of DC, diffusing from the center. The lines build a continous connection from the north-west to south-east, while having some connections from north to the central part of DC.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/visualization station_8bab9160031ca27f383657859d650d06">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> <span class="fu">st_union</span>(tracts19)) <span class="sc">+</span></span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> dc_station,</span>
@@ -373,13 +405,17 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> dc_line,</span>
 <span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>          <span class="fu">aes</span>(<span class="at">color =</span> GIS_ID),</span>
 <span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>          <span class="at">show.legend =</span> <span class="st">'Line'</span>,<span class="at">size=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/visualization station-1.png" class="img-fluid" width="672"></p>
 </div>
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">'Station stops'</span>,</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">'Washington DC'</span>,</span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">'Figure 1,1'</span>)<span class="sc">+</span></span>
 <span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"blue"</span>,<span class="st">"green"</span>,<span class="st">"orange"</span>,<span class="st">"red"</span>,<span class="st">"#C0C0C0"</span>,<span class="st">"yellow"</span>),<span class="at">name=</span><span class="st">"Metro Line"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output cell-output-stdout">
 <pre><code>NULL</code></pre>
 </div>
@@ -390,6 +426,8 @@ Geodetic CRS:  WGS 84</code></pre>
 <h1>Definition of TOD region</h1>
 <p>To explore the influence of TOD, we need to clarify the range of TOD region. First of all, we set 0.5 miles, 15 minutes walking distance, from station as the range in the influence of TOD. Secondly, we choose three different methods to define the range of tracts in TOD region, composed of the range in the 0.5 mile’s buffer, the tracts which centroid point is in the 0.5 mile’s buffer, and the tracts that have intersection with 0.5 mile’s buffer.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/station buffer dataset_9af49ce8b2e0d3fb59293fff2c2d1025">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>station_buffer<span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_buffer</span>(dc_station,<span class="dv">2640</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">Legend =</span> <span class="st">'buffer'</span>)<span class="sc">%&gt;%</span></span>
@@ -398,8 +436,11 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_sf</span>()<span class="sc">%&gt;%</span></span>
 <span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">Legend =</span> <span class="st">'Unioned Buffer'</span>)</span>
 <span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/station buffer range_557edf1d65f79dae1eed45bda46614b9">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> station_buffer) <span class="sc">+</span></span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> dc_station,</span>
@@ -408,33 +449,48 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">'Station 0.5 miles buffer'</span>,</span>
 <span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">'Figure 1.2'</span>)<span class="sc">+</span></span>
 <span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/station buffer range-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/get the union buffer dataset_1123f3fd35fc5e67e6c3bc2aca140c63">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>buffer <span class="ot">&lt;-</span> <span class="fu">filter</span>(station_buffer, Legend<span class="sc">==</span><span class="st">'Unioned Buffer'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>clip <span class="ot">&lt;-</span> <span class="fu">st_intersection</span>(buffer,tracts19) <span class="sc">%&gt;%</span></span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(TotalPop)<span class="sc">%&gt;%</span></span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">inter_type =</span> <span class="st">'Clip'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/selection-2_258e48e84512577e90480153106ec692">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>selection <span class="ot">&lt;-</span> tracts19[buffer,]<span class="sc">%&gt;%</span></span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(TotalPop)<span class="sc">%&gt;%</span></span>
 <span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">inter_type =</span> <span class="st">'Spatial Selection'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/selection-3_5f9e6224bcef46bb619a5d22fde055c2">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>select_centroid <span class="ot">&lt;-</span> <span class="fu">st_centroid</span>(tracts19)[buffer,] <span class="sc">%&gt;%</span></span>
 <span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
 <span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(., dplyr<span class="sc">::</span><span class="fu">select</span>(tracts19, GEOID), <span class="at">by =</span> <span class="st">"GEOID"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_sf</span>() <span class="sc">%&gt;%</span></span>
 <span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(TotalPop) <span class="sc">%&gt;%</span></span>
 <span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">inter_type =</span> <span class="st">"Centroids"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <p>After the visualization of three different definition method, we can easily find that the third way includes much more tracts’ area especially some large tracts and excessive inclusion due to irregular boundary shapes. Comparing the first and second method, despite the second method has the most precise boundry of TOD range, the unit of data is tract make such method have more problem in data representing.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/selection visualize and compare_85a0b509a1e77934a1985e356d2658fb">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>intersections <span class="ot">&lt;-</span> <span class="fu">rbind</span>(clip, selection, select_centroid)</span>
 <span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
@@ -445,12 +501,15 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">'3 different TOD range selection methods comaparison'</span>,</span>
 <span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">'Figure 1.3'</span>)<span class="sc">+</span></span>
 <span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/selection visualize and compare-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <p>if we use the second method to define TOD area and use the tract, whose GEOID is not in the set of tracts in TOD area, we can find that large part of tracts get lost in the map. The situation results from the same dilemma as the third method to define TOD region. the tract information in such small area could not represent the whole tract, especially estimating the influence of TOD. As a result, we select the first approach as our way to define TOD region. However, we still need to acknowledge the limitation of less consideration of tract that in a close distance to TOD but have not direct intersection to 0.5 miles’ buffer in the first method.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/final selection of centroids_16c8267ad600224e20cdf87faceb6445">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>tod_part <span class="ot">&lt;-</span> <span class="fu">st_intersection</span>(buffer,allTracts)<span class="sc">%&gt;%</span></span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">TOD =</span> <span class="st">'TOD'</span>)<span class="sc">%&gt;%</span></span>
 <span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>Legend)</span>
@@ -465,6 +524,7 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">'Drawback of clip method to define TOD'</span>,</span>
 <span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">'Figure 1.4'</span>)<span class="sc">+</span></span>
 <span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/final selection of centroids-1.png" class="img-fluid" width="672"></p>
 </div>
@@ -476,6 +536,8 @@ Geodetic CRS:  WGS 84</code></pre>
 <h2 class="anchored" data-anchor-id="tod-dataset-create">TOD dataset create</h2>
 <p>Based on the selected defining method, we set TOD label for ACS-5 dataset. Considering the inflation, we make inflation adjustment on the median rent and median household income in the dataset for better comparison.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/TOD label set_19415aa08a308bddf32ca87123da3a62">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>allTracts.group <span class="ot">&lt;-</span> </span>
 <span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rbind</span>(</span>
 <span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">st_centroid</span>(allTracts)[buffer,] <span class="sc">%&gt;%</span></span>
@@ -490,23 +552,32 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">TOD =</span> <span class="st">"Non-TOD"</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">MedRent.inf =</span> <span class="fu">ifelse</span>(year <span class="sc">==</span> <span class="st">"2009"</span>, MedRent <span class="sc">*</span> <span class="fl">1.19</span>, MedRent))<span class="sc">%&gt;%</span></span>
 <span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">MedHHInc.inf =</span> <span class="fu">ifelse</span>(year <span class="sc">==</span> <span class="st">"2009"</span>, MedHHInc <span class="sc">*</span><span class="fl">1.19</span>, MedHHInc)) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/get tracrts centroid dataset_ebca023edaa8a2dfe424310c949759dc">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>centroid_all <span class="ot">&lt;-</span> <span class="fu">st_centroid</span>(allTracts.group, <span class="at">of_largest_polygon =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <p>Meanwhile, we filter the part with ‘TOD’ label in dataset for further deeper analysis in the TOD region.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/area of TOD_ecd9f01aad8bc480cb9b35d79098254b">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>Tod_region <span class="ot">&lt;-</span> allTracts.group <span class="sc">%&gt;%</span></span>
 <span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(TOD) <span class="sc">%&gt;%</span></span>
 <span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(TOD <span class="sc">==</span><span class="st">"TOD"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_union</span>() <span class="sc">%&gt;%</span></span>
 <span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_sf</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 </section>
 <section id="social-and-economic-analysis-based-on-tod" class="level2">
 <h2 class="anchored" data-anchor-id="social-and-economic-analysis-based-on-tod">Social and economic analysis based on TOD</h2>
 <p>Before discussing the impacts of railway station to surrounding tracts, we figure out the difference of TOD region between 2009 and 2019. We can find that the most tracts in 2019 kept the same as 2009, except few tracts was excluded due to tracts’ re-split. Overall, the TOD region kept the same from 2009 to 2019.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/TOD space time compare_fbd516e226b83370e63f04ea4f607040">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(allTracts.group)<span class="sc">+</span></span>
 <span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> <span class="fu">st_union</span>(tracts19))<span class="sc">+</span></span>
 <span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> TOD))<span class="sc">+</span></span>
@@ -515,12 +586,15 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Figure 2.1"</span>)<span class="sc">+</span></span>
 <span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>year)<span class="sc">+</span></span>
 <span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/TOD space time compare-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <p>From the map of population distribution, we can find that DC has more population in 2019 in general. Besides the north-west and south part, the north-east part had trend to become another populations agglomeration. However,there’s not obvious difference in the population change in the TOD area.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/population change_785d78021a64be3faf7209170f052d9a">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Total Population within the TOD &amp; Non-TOD tracts from 2009 to 2019</span></span>
 <span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(allTracts.group)<span class="sc">+</span></span>
 <span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> <span class="fu">st_union</span>(tracts19))<span class="sc">+</span></span>
@@ -534,12 +608,15 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb32-11"><a href="#cb32-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Figure 2.2"</span>)<span class="sc">+</span></span>
 <span id="cb32-12"><a href="#cb32-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>year)<span class="sc">+</span></span>
 <span id="cb32-13"><a href="#cb32-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/population change-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <p>When it comes to the median household income, we can easily find that the north-west part have a average higher income level, which kept the same situation from 2009 to 2019. Focusing on the TOD region, we can find that in the center part of TOD region had an apparent median household income increase comapred to the surrounding areas.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/median household income change_4f0dd410db9aeb3f22282ef49f7bc2ec">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Median household income within the TOD &amp; Non-TOD tracts from 2009 to 2019</span></span>
 <span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(allTracts.group)<span class="sc">+</span></span>
 <span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> <span class="fu">st_union</span>(tracts19))<span class="sc">+</span></span>
@@ -553,12 +630,15 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Figure 2.3"</span>)<span class="sc">+</span></span>
 <span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>year)<span class="sc">+</span></span>
 <span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/median household income change-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <p>Compared to change in median household income, the high-education group (the group have the bachelors or higher degree) distribution had an interesting change in the decade. Compared to 2009, the high-education group gradually moved to the central part of DC from north-west part. Despite not much strong evidence showing the influence of TOD, the central part, which locates many transfer station, still had potential influence of gathering of people.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/education level change_77b13647bf27b72d5d4e1ed4f939209d">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Percentage of bachelors within the TOD &amp; Non-TOD tracts from 2009 to 2019</span></span>
 <span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(allTracts.group)<span class="sc">+</span></span>
 <span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> <span class="fu">st_union</span>(tracts19))<span class="sc">+</span></span>
@@ -572,12 +652,15 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Figure 2.4"</span>)<span class="sc">+</span></span>
 <span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>year)<span class="sc">+</span></span>
 <span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/education level change-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <p>The change in median rent price has a similar trend like change in median household income. In general, whole DC experienced a rent increase in the decade, with north part owning a higher median rent price. Also, the region in the influence of TOD tend to have a higehr price in 2019 comapred to 2009.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/median rent changev_4372915af0e4eb671d8c9bb0d57d64b3">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Median Rent within the TOD &amp; Non-TOD tracts from 2009 to 2019</span></span>
 <span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(allTracts.group)<span class="sc">+</span></span>
 <span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> <span class="fu">st_union</span>(tracts19))<span class="sc">+</span></span>
@@ -591,12 +674,15 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Figure 2.5"</span>)<span class="sc">+</span></span>
 <span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>year)<span class="sc">+</span></span>
 <span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/median rent changev-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <p>Concerning public safety, we can find that crime counts had a slight increase in the decade, concentrating in the central and east part of DC. As the trasfer station located in the central part before, we can assume that the TOD could also increase the crime possibility in the radius area.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/crime change_b97cc41137750a66db1604a88b0d712c">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co">#Crime counts within the TOD &amp; Non-TOD tracts from 2009 to 2019</span></span>
 <span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(allTracts.group)<span class="sc">+</span></span>
 <span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> <span class="fu">st_union</span>(tracts19))<span class="sc">+</span></span>
@@ -610,6 +696,7 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Figure 2.6"</span>)<span class="sc">+</span></span>
 <span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>year)<span class="sc">+</span></span>
 <span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/crime change-1.png" class="img-fluid" width="672"></p>
 </div>
@@ -621,6 +708,8 @@ Geodetic CRS:  WGS 84</code></pre>
 <p>Besides the brief summary and regional analysis from mapping, we create table to make more rigorous and data-driven analysis about the difference between TOD and non-TOD area. From the table and bar charts, when we focus on the change from 2009 to 2019, the household income, crime count, population and median rent both increased in TOD and Non-TOD region. Besides, percentage white decreased in Non-TOD region while percentage of poverty decrease in TOD region.</p>
 <p>Considering the difference in TOD and Non-TOD region, we can find a huge switch between 2009 and 2019. Compared to 2009, the TOD region in 2019 had faster crime numbers, household income, percentage of white, median rent price and population increase than Non-TOD region. Besides the percentage of poverty got lower in TOD region than that in Non-TOD, whose situation was reversed in 2009.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/summary table_7942055997af9e4ff23bc4896e4a75af">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>allTracts.Summary <span class="ot">&lt;-</span> </span>
 <span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>(allTracts.group) <span class="sc">%&gt;%</span></span>
 <span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year, TOD) <span class="sc">%&gt;%</span></span>
@@ -641,6 +730,7 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb37-18"><a href="#cb37-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>() <span class="sc">%&gt;%</span></span>
 <span id="cb37-19"><a href="#cb37-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">footnote</span>(<span class="at">general_title =</span> <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>,</span>
 <span id="cb37-20"><a href="#cb37-20" aria-hidden="true" tabindex="-1"></a>           <span class="at">general =</span> <span class="st">"Table 1"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <table class="table table-sm table-striped small" data-quarto-postprocess="true">
 <colgroup>
@@ -733,6 +823,8 @@ Geodetic CRS:  WGS 84</code></pre>
 </div>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/table visualization_4afabcf7a0dd48de084c641dbdb2cfb7">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>allTracts.Summary <span class="sc">%&gt;%</span></span>
 <span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">gather</span>(Variable, Value, <span class="sc">-</span>year, <span class="sc">-</span>TOD) <span class="sc">%&gt;%</span></span>
 <span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(year, Value, <span class="at">fill =</span> TOD)) <span class="sc">+</span></span>
@@ -743,6 +835,7 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Indicator differences across time and space"</span>,</span>
 <span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">'Figure 2.7'</span>) <span class="sc">+</span></span>
 <span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plotTheme</span>() <span class="sc">+</span> <span class="fu">theme</span>(<span class="at">legend.position=</span><span class="st">"bottom"</span>,)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/table visualization-1.png" class="img-fluid" width="672"></p>
 </div>
@@ -757,6 +850,8 @@ Geodetic CRS:  WGS 84</code></pre>
 <h3 class="anchored" data-anchor-id="population-analysis">Population analysis</h3>
 <p>To get the influence based on station, we use spatial join to get the tracts that in each station, and then sum up the population based on the station’s name. From the map, we can find that the station in the central part of DC gathered more people than the surrounding areas. The phenomenon could result from the gathering influence of transfer station in this region. What’s more, the central part also had more increase in total population than surrounding areas.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/pop info in station_2883bd69690dcf50910b3573e4ca5594">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>buffer_new<span class="ot">&lt;-</span> <span class="fu">st_buffer</span>(dc_station,<span class="dv">2640</span>)<span class="sc">%&gt;%</span></span>
 <span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(NAME)</span>
 <span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -768,8 +863,11 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>()</span>
 <span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb39-11"><a href="#cb39-11" aria-hidden="true" tabindex="-1"></a>station_new <span class="ot">&lt;-</span> <span class="fu">left_join</span>(dc_station,pop_area_sum,<span class="at">by=</span><span class="st">'NAME'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/graduated symbol maps of population_09c65b3b833efab7b44aaa1120e18158">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co"># population</span></span>
 <span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
 <span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> allTracts.group,<span class="at">fill=</span><span class="st">'grey40'</span>) <span class="sc">+</span> </span>
@@ -783,6 +881,7 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb40-11"><a href="#cb40-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">'Figure 3.1'</span>)<span class="sc">+</span></span>
 <span id="cb40-12"><a href="#cb40-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>year) <span class="sc">+</span></span>
 <span id="cb40-13"><a href="#cb40-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">5</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/graduated symbol maps of population-1.png" class="img-fluid" width="672"></p>
 </div>
@@ -792,6 +891,8 @@ Geodetic CRS:  WGS 84</code></pre>
 <h3 class="anchored" data-anchor-id="median-rent-analysis">Median Rent analysis</h3>
 <p>Having the similar data process step with population analysis one, we can find that the whole TOD region had an obvious median rent increase. When we look at the increase trend, we can find that the center to south-east TOD part have a higher median rent price increase compared to the north-west part, which may result from the the area’s 2009 median rent price were on the high side for DC.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/rent info in station_ce14f628507c0c29c06c383b4eea95e8">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>rent_area <span class="ot">&lt;-</span> <span class="fu">st_join</span>(buffer_new,allTracts<span class="sc">%&gt;%</span><span class="fu">select</span>(MedRent,year))</span>
 <span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>rent_area[<span class="fu">is.na</span>(rent_area)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
 <span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a></span>
@@ -801,8 +902,11 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>()</span>
 <span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a>station_new2 <span class="ot">&lt;-</span> <span class="fu">left_join</span>(dc_station,rent_area_sum,<span class="at">by=</span><span class="st">'NAME'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/graduated symbol maps of median rent_647c07ef3d74401306cdc115b22b71a7">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># rent</span></span>
 <span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
 <span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> allTracts.group,<span class="at">fill=</span><span class="st">'grey40'</span>) <span class="sc">+</span> </span>
@@ -816,6 +920,7 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">'Figure 3.2'</span>)<span class="sc">+</span></span>
 <span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>year) <span class="sc">+</span></span>
 <span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">5</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/graduated symbol maps of median rent-1.png" class="img-fluid" width="672"></p>
 </div>
@@ -826,6 +931,8 @@ Geodetic CRS:  WGS 84</code></pre>
 <h2 class="anchored" data-anchor-id="the-analysis-of-the-distance-to-tod">The analysis of the distance to TOD</h2>
 <p>After the analysis for TOD radius areas, we try to make an analysis that if the distance from station have some continuous influence to social economic indicator. We make multi buffer based on the station, and then use the center point of tracts to represent the data in each tracts. Based on the points location relationship to the buffer rings, we label the distances information in each tracts dataset and make further analysis.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/create multirings of tracts_f55cc1bc409f90b45a14c598a8b1d7c5">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>station_ring <span class="ot">&lt;-</span> <span class="fu">multipleRingBuffer</span>(<span class="fu">st_union</span>(dc_station), <span class="dv">2640</span><span class="sc">*</span><span class="dv">9</span>, <span class="dv">2640</span>)</span>
 <span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>allTracts.rings <span class="ot">&lt;-</span></span>
@@ -836,8 +943,11 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>            <span class="at">by=</span><span class="fu">c</span>(<span class="st">"GEOID"</span><span class="ot">=</span><span class="st">"GEOID"</span>, <span class="st">"year"</span><span class="ot">=</span><span class="st">"year"</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_sf</span>() <span class="sc">%&gt;%</span></span>
 <span id="cb43-10"><a href="#cb43-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">distance =</span> distance <span class="sc">/</span> <span class="dv">5280</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/visualize half mile buffers_e7990e2c5b1bb69263f6858ef7c18491">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
 <span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_sf</span>(<span class="at">data=</span>station_ring,<span class="fu">aes</span>(<span class="at">color=</span>distance)) <span class="sc">+</span></span>
 <span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_gradient</span>()<span class="sc">+</span></span>
@@ -847,11 +957,14 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>         <span class="at">subtitle =</span> <span class="st">"Washington DC"</span>,</span>
 <span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">caption =</span> <span class="st">"Figure 3.3"</span>) <span class="sc">+</span></span>
 <span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/visualize half mile buffers-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/Distance to stations_29c1a36bcf1b2cd7dc3271af5c48eec3">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(allTracts.rings)<span class="sc">+</span></span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> <span class="fu">st_union</span>(tracts19))<span class="sc">+</span></span>
 <span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> <span class="fu">as.factor</span>(distance)))<span class="sc">+</span></span>
@@ -863,23 +976,30 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb45-9"><a href="#cb45-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">subtitle =</span> <span class="st">"Washington DC"</span>,</span>
 <span id="cb45-10"><a href="#cb45-10" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Figure 3.4"</span>)<span class="sc">+</span></span>
 <span id="cb45-11"><a href="#cb45-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mapTheme</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/Distance to stations-1.png" class="img-fluid" width="672"></p>
 </div>
 </div>
 <p>From the line chart of average median rent in different distances to station, we can find that the rent had a general increase from 2009 to 2019, which also show the same trend that the rent price gradually decrease when far from station at the beginning, and then increase to the peak when the distance comes to 2 to 2.5 miles. Due to the tract data which distance to TOD is 3.5 miles is Null and filled with 0 in data cleaning, we can still draw the conclusion from existing 2009 data that the rent will decrease again after 2.5 miles.</p>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/dataset of rent based on distance_dbcd3a2ef08e92110f6c908367859f4c">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>allTracts.rings[<span class="fu">is.na</span>(allTracts.rings)] <span class="ot">&lt;-</span> <span class="dv">0</span></span>
 <span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>summary <span class="ot">&lt;-</span> allTracts.rings<span class="sc">%&gt;%</span></span>
 <span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
 <span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year,distance)<span class="sc">%&gt;%</span></span>
 <span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">averagerent =</span> <span class="fu">mean</span>(MedRent))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 </div>
 <div class="cell" data-hash="MUSA508_Ass2_new_cache/html/rent-distance visualization_bded3acf12806b31fd003f5fdf2f3009">
+<details>
+<summary>Code</summary>
 <div class="sourceCode cell-code" id="cb47"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data=</span>summary,<span class="fu">aes</span>(<span class="at">x=</span>distance, <span class="at">y=</span>averagerent, <span class="at">group=</span>year, <span class="at">color=</span>year)) <span class="sc">+</span></span>
 <span id="cb47-2"><a href="#cb47-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>() <span class="sc">+</span></span>
 <span id="cb47-3"><a href="#cb47-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ggtitle</span>(<span class="st">"Average rent in differnt distance to station"</span>) <span class="sc">+</span></span>
 <span id="cb47-4"><a href="#cb47-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ylab</span>(<span class="st">"Average rent"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
 <div class="cell-output-display">
 <p><img src="MUSA508_Ass2_new_files/figure-html/rent-distance visualization-1.png" class="img-fluid" width="672"></p>
 </div>

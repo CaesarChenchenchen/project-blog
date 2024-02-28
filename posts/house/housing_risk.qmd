@@ -1,0 +1,447 @@
+---
+title: "Housing Subsidy"
+author: "Tianxiao"
+date: "2023-10-31"
+categories: [real estate, code, analysis]
+image: "ah.jpeg"
+format:
+  html:
+    code-fold: true
+    code-summary: "Show the code"
+---
+
+# Introduction
+The Department of Housing and Community Development (HCD) in Emil City is launching a home repair tax credit program, and they want to reach out to those who are most likely to take this credit at a low cost. When reaching out randomly, only 11% of the homeowners take this credit and the unsuccessful reach out also wastes a large amount of money.
+
+In order to make the most use of the housing subsidy and create a satisfying benefit, I will build a logistic regression model to predict under given features whether a homeowner will take the credit or not.
+
+```{r load package,results='hide',message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=10000000)
+library(tidyverse)
+library(kableExtra)
+library(caret)
+library(knitr) 
+library(pscl)
+library(plotROC)
+library(pROC)
+library(lubridate)
+library(ggcorrplot) 
+library(vcd)
+library(grid)
+```
+
+```{r load_data, cache = TRUE}
+palette5 <- c("#264653","#2a9d8f","#e9c46a",'#f4a261',"#e76f51")
+palette4 <- c("#264653","#2a9d8f","#e9c46a","#e76f51")
+palette2 <- c("#264653","#2a9d8f")
+
+churn <- read.csv('/Users/mr.smile/Desktop/UPENN/FALL23/MUSA508/musa_5080_2023-main/Housing Subsidy/churnBounce.csv')
+
+house_sub <- read.csv('/Users/mr.smile/Desktop/UPENN/FALL23/MUSA508/musa_5080_2023-main/Housing Subsidy/housingSubsidy.csv')
+```
+
+# Data Visualization
+Firstly, we want to figure out if there's significantly feature difference in the groups whether they entered the program, which is useful and effective to determine the potential correlation between different variables and choices.
+The bar plot showing the median value of the feature, which represent the average situation, doesn't tell much difference in whether enter the program. Besides, we can find that the group entering the program has a slightly higher median age and lower spend on repairs than the group not entering the program.
+```{r median_plot}
+house_sub %>%
+  dplyr::select(y,age, spent_on_repairs, cons.price.idx, cons.conf.idx) %>%
+  gather(Variable, value, -y) %>%
+    ggplot(aes(y, value, fill=y)) + 
+      geom_bar(position = "dodge", stat = "summary", fun = "median") + 
+      facet_wrap(~Variable, scales = "free") +
+      scale_fill_manual(values = palette2) +
+      labs(x="Churn", y="Value", 
+           title = "Feature associations with the likelihood of entering the program",
+           subtitle = "(continous outcomes)") +
+      theme(legend.position = "none")
+```
+
+When it comes to the density plot of the features above, we can find two groups have apparent differences in the distribution. The group entering the program has a relatively lower distribution in the age from 30 to 50 years. As for the spend on repairs, we can clearly find that the group entering the program has an obviously lower distribution in the higher spend interval. When we focus on the economic background of the decision, we can find that the lower confidence index, which represent the relatively low consumption desire, have less influence on the group entering the program. Meanwhile, the higher consumer price index has more association with the rejection to enter the program. 
+
+```{r density_plot}
+house_sub %>%
+    dplyr::select(y,age, spent_on_repairs, cons.price.idx, cons.conf.idx) %>%
+    gather(Variable, value, -y) %>%
+    ggplot() + 
+    geom_density(aes(value, color=y), fill = "transparent") + 
+    facet_wrap(~Variable, scales = "free") +
+    scale_fill_manual(values = palette2) +
+    labs(title = "Feature distributions enter vs. no enter",
+         subtitle = "(continous outcomes)")
+```
+
+When we look at the count plot for different features related to whether entering the program, we can find that, in general, the group not entering the program has more members than that entering the program. In the job feature, we can find that the gap in some field is more extreme like administor, blue-collar, and technican.
+
+```{r count_plot}
+house_sub %>%
+    dplyr::select(y, marital,job,taxLien,poutcome) %>%
+    gather(Variable, value, -y) %>%
+    count(Variable, value, y) %>%
+      ggplot(., aes(value, n, fill = y)) +   
+        geom_bar(position = "dodge", stat="identity") +
+        facet_wrap(~Variable, scales="free") +
+        scale_fill_manual(values = palette2) +
+        labs(x="Click", y="Value",
+             title = "Feature associations with the likelihood of entering",
+             subtitle = "Categorical features") +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+# Data Modeling
+
+## Feature Engineering
+
+From the initial data visualization, we could hardly figure out the significantly difference between two different groups. Therefore, it's essential to engineering the feature to improve further model performance. As for the education, jobs and pdays, which both have many categories, I re-categorize these feature into fewer categories. What's more, I standardize the cpi and cci indicator to improve the interpretablity.
+
+```{r feature engineering}
+house_sub$cons.price.idx_s <- scale(house_sub$cons.price.idx)
+house_sub$cons.conf.idx_s <- scale(house_sub$cons.conf.idx)
+house_sub$poutcome_new <- ifelse(house_sub$poutcome == "success", 1, 0)
+house_sub <- 
+  house_sub %>% 
+  mutate(education,
+         education_new = case_when(education == "basic.4y" ~ "medium",
+                               education == "basic.6y" ~ "medium",
+                               education == "basic.9y" ~ "high",
+                               education == "high.school" ~ "high", 
+                               education == "professional.course" ~ "high",
+                               education == "university.degree" ~ "very high",
+                               education == "illiterate"  ~ "low", 
+                               education == "unknown" ~ "low"))%>%
+  mutate(job,
+         job_new = case_when(job == "retired" ~ "low income",
+                         job == "unemployed" ~ "low income", 
+                         job =="unknown" ~ "low income", 
+                         job == "student" ~ "low income",
+                         job == "housemaid" ~ "medium income",
+                         job == "blue-collar" ~ "medium income",
+                         job == "services" ~ "medium income",
+                         job == "technician" ~ "high income",
+                         job ==  "management" ~ "high income",
+                         job == "admin." ~ "high income",
+                         job == "entrepreneur" ~ "very high income", 
+                         job == "self-employed" ~ "medium income")) %>%
+  mutate(pdays,
+         pdays_new = case_when(pdays == "0"  ~ "0-6",
+                           pdays == "1" ~ "0-6", 
+                           pdays == "2" ~ "0-6", 
+                           pdays == "3" ~ "0-6", 
+                           pdays == "4" ~ "0-6", 
+                           pdays == "5" ~ "0-6", 
+                           pdays == "6" ~ "0-6", 
+                           pdays == "7" ~ "7-15",
+                           pdays == "9"  ~ "7-15",
+                           pdays == "10"  ~ "7-15", 
+                           pdays == "11"  ~ "7-15", 
+                           pdays == "12"  ~ "7-15", 
+                           pdays == "13"  ~ "7-15", 
+                           pdays == "14"  ~ "7-15", 
+                           pdays == "15"  ~ "7-15", 
+                           pdays == "17" ~ "16-21", 
+                           pdays == "18" ~ "16-21",
+                           pdays == "19" ~ "16-21", 
+                           pdays == "21"~ "16-21", 
+                           pdays == "16" ~ "16-21",
+                           pdays == "999" ~ "unknown"))
+  
+```
+
+## Training and Test split
+
+After feature engineering, I split the dataset into training and test one with 65/35 for further data modeling. To compare the performance of new feature, I test the performance of both model using the raw features in the dataset and model with variables after feature engineering and selection.  
+
+```{r data spliting}
+trainIndex <- createDataPartition(house_sub$y, p = .65,
+                                  list = FALSE,
+                                  times = 1)
+houseTrain <- house_sub[ trainIndex,]
+houseTest  <- house_sub[-trainIndex,]
+```
+
+```{r raw data modeling}
+set.seed(3426)
+tempModel <- glm(y_numeric ~ .,
+                  data=houseTrain %>% 
+                    dplyr::select(-X,- y,-cons.price.idx_s,-cons.conf.idx_s,
+                                  -poutcome_new,-education_new,-job_new,-pdays_new),
+                  family="binomial" (link="logit"))
+
+testProbs_raw <- data.frame(Outcome = as.factor(houseTest$y_numeric),
+                        Probs = predict(tempModel, houseTest, type= "response"))
+summary(tempModel)
+```
+
+```{r modeling new feature}
+set.seed(3426)
+newModel <- glm(y_numeric ~ .,
+                  data=houseTrain %>% 
+                    dplyr::select(-X,-y,-poutcome,-education,-job,-pdays,
+                                  -age,-day_of_week,-mortgage,
+                                -taxbill_in_phl,-taxLien,-cons.price.idx,-cons.conf.idx
+                                  ),
+                  family="binomial" (link="logit"))
+
+testProbs <- data.frame(Outcome = as.factor(houseTest$y_numeric),
+                        Probs = predict(newModel, houseTest, type= "response"))
+summary(newModel)
+```
+
+## Model Evaluation
+
+### Distribution of Predicted Probabilities
+
+When we look at the density plot of the predicted probabilities by observed outcome by different models, we can find that the distribution of these two model has little difference, while the model with new feature have more concentration and higher density in the prediction for not entering the program. 
+
+```{r plot_testProbs_new}
+ggplot(testProbs, aes(x = Probs, fill = as.factor(Outcome))) + 
+  geom_density() +
+  facet_grid(Outcome ~ .) +
+  scale_fill_manual(values = palette2) +
+  labs(x = "Enter", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome(new)") +
+  theme(strip.text.x = element_text(size = 18),
+        legend.position = "none")
+```
+
+```{r plot_testProbs_old}
+ggplot(testProbs_raw, aes(x = Probs, fill = as.factor(Outcome))) + 
+  geom_density() +
+  facet_grid(Outcome ~ .) +
+  scale_fill_manual(values = palette2) +
+  labs(x = "Enter", y = "Density of probabilities",
+       title = "Distribution of predicted probabilities by observed outcome(raw)") +
+  theme(strip.text.x = element_text(size = 18),
+        legend.position = "none")
+```
+
+### Threshold setting and analysis
+
+Based on the density, I set the probability's threshold of 0.14 for determine whether the objective will enter the program. From the aspect of sensitivity, which represent the ability to correctly identify positive instances, the new model has better performance than the model with raw feature.
+
+```{r thresholds_new}
+testProbs <- 
+  testProbs %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs$Probs > 0.5 , 1, 0)))
+
+caret::confusionMatrix(testProbs$predOutcome, testProbs$Outcome, 
+                       positive = "1")
+```
+
+```{r thresholds_old}
+testProbs_raw <- 
+  testProbs_raw %>%
+  mutate(predOutcome  = as.factor(ifelse(testProbs_raw$Probs > 0.5 , 1, 0)))
+
+caret::confusionMatrix(testProbs_raw$predOutcome, testProbs_raw$Outcome, 
+                       positive = "1")
+```
+
+### ROC Curve & AUC score
+
+To see the performance of two models more directly, I check the ROC(Receiver Operating Characteristic) curve, which visualize the performance of binary classification model. The curve that is “above” the y=x line shows the good performance of model. What's more, I use the AUC (area under curve) score to measure the behavior, with higher score represent better ability to distinguish between the features. And the model with new feature having higher AUC score indicates the better interpretability for whether entering the program.
+
+```{r roc_curve, warning = FALSE, message = FALSE}
+ggplot(testProbs, aes(d = as.numeric(Outcome), m = Probs)) +
+  geom_roc(n.cuts = 50, labels = FALSE, colour = "#FE9900") +
+  style_roc(theme = theme_grey) +
+  geom_abline(slope = 1, intercept = 0, size = 1.5, color = 'grey') +
+  labs(title = "ROC Curve - clickModel")
+```
+
+```{r auc, message = FALSE, warning = FALSE}
+auc(testProbs$Outcome, testProbs$Probs)
+auc(testProbs_raw$Outcome, testProbs_raw$Probs)
+```
+
+## Cross Validation & Fitness
+
+To assess the performance and generalization ability of two models and identify the issue of over-fitting due to randomness of train and test data splitting, I use cross validation to compare and select the final model. Comparing the results of two models, we can find that the the new model in general has better performance due to higher ROC score and sensitivity.
+
+```{r cv_new}
+ctrl <- trainControl(method = "cv", number = 100, classProbs=TRUE, summaryFunction=twoClassSummary)
+
+cvFit <- train(y ~ .,
+                  data=house_sub %>% 
+                    dplyr::select(-X,-y_numeric,-poutcome,-education,-job,-pdays,
+                                  -age,-day_of_week,-mortgage,
+                                -taxbill_in_phl,-taxLien,-cons.price.idx,-cons.conf.idx), 
+                method="glm", family="binomial",
+                metric="ROC", trControl = ctrl)
+
+cvFit
+```
+
+```{r cv_raw}
+cvFit_raw <- train(y ~ .,
+                  data=house_sub %>% 
+                    dplyr::select(-X,- y_numeric,-cons.price.idx_s,-cons.conf.idx_s,
+                                  -poutcome_new,-education_new,-job_new,-pdays_new), 
+                method="glm", family="binomial",
+                metric="ROC", trControl = ctrl)
+
+cvFit_raw
+```
+
+To check the goodness of fitting metrics more clearly, I visualize the result of 100 times cross validation to see the generalization and stability of the model when confronting different data. From the histogram of ROC score, we can find that the new model has distribution more like normal distribution compared the the raw model, and the situation shows that the new model is relatively more stable across different subsets of the data. What's more, when we focus on the distribution of sensitivity, the new model has more density on the higher sensitivity score, which shows that the new model has better ability to correctly identify positive instances.
+
+```{r goodness_metrics_new, message = FALSE, warning = FALSE}
+dplyr::select(cvFit$resample, -Resample) %>%
+  gather(metric, value) %>%
+  left_join(gather(cvFit$results[2:4], metric, mean)) %>%
+  ggplot(aes(value)) + 
+    geom_histogram(bins=35, fill = "#2a9d8f") +
+    facet_wrap(~metric) +
+    geom_vline(aes(xintercept = mean), colour = "#e76f51", linetype = 3, size = 1.5) +
+    scale_x_continuous(limits = c(0, 1)) +
+    labs(x="Goodness of Fit", y="Count", title="CV Goodness of Fit Metrics(new)",
+         subtitle = "Across-fold mean reprented as dotted lines")
+```
+
+```{r goodness_metrics_old, message = FALSE, warning = FALSE}
+dplyr::select(cvFit_raw$resample, -Resample) %>%
+  gather(metric, value) %>%
+  left_join(gather(cvFit$results[2:4], metric, mean)) %>%
+  ggplot(aes(value)) + 
+    geom_histogram(bins=35, fill = "#2a9d8f") +
+    facet_wrap(~metric) +
+    geom_vline(aes(xintercept = mean), colour = "#e76f51", linetype = 3, size = 1.5) +
+    scale_x_continuous(limits = c(0, 1)) +
+    labs(x="Goodness of Fit", y="Count", title="CV Goodness of Fit Metrics(old)",
+         subtitle = "Across-fold mean reprented as dotted lines")
+```
+
+# Cost-Benefit Calculation
+
+## Situation Definition
+
+To use the model to help calculate the benefits under the prediction of model, we need to set the benefits of different combinations of predicted and actual situation first. Our approach will be to use the confusion matrix from testProbs. Below the cost/benefit for each outcome in our confusion matrix is calculated, like so:
+
+True Negative: $0
+True Positive: (-\$2850 - \$5000 + \$10000 + \$56000)\*0.25\*Count - $2850\*0.75*Count
+False Negative: -$2850*Count
+False Positive: $0
+
+## Cost-Benefit Analysis
+
+From the result of cost/benefit table, we can find that the main benefit comes from True-positive situation, which represent we correctly predict that the homeowner will enter the program. And the main cost comes from False-positive, where we would put into money for marketing source and the homeowners will not enter.
+```{r cost_benefit}
+cost_benefit_table <-
+   testProbs %>%
+      count(predOutcome, Outcome) %>%
+      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
+                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
+                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
+                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
+       gather(Variable, Count) %>%
+       mutate(Revenue =
+               ifelse(Variable == "True_Negative",0,
+               ifelse(Variable == "True_Positive",((-2850-5000+10000+56000)*(Count*0.25)+(-2850*Count*0.75)),
+               ifelse(Variable == "False_Negative", 0,
+               ifelse(Variable == "False_Positive", -2850 * Count, 0))))) %>%
+    bind_cols(data.frame(Description = c(
+              "We correctly predicted no enter",
+              "We correctly predicted enter",
+              "We predicted no enter and homeowner want to enter",
+              "We predicted homeowner will enter and homeowner did not enter")))
+
+kable(cost_benefit_table,
+       caption = "Cost/Benefit Table") %>% kable_styling()
+```
+
+```{r threshold_function}
+iterateThresholds <- function(data) {
+  x = .01
+  all_prediction <- data.frame()
+  while (x <= 1) {
+  
+  this_prediction <-
+      testProbs %>%
+      mutate(predOutcome = ifelse(Probs > x, 1, 0)) %>%
+      count(predOutcome, Outcome) %>%
+      summarize(True_Negative = sum(n[predOutcome==0 & Outcome==0]),
+                True_Positive = sum(n[predOutcome==1 & Outcome==1]),
+                False_Negative = sum(n[predOutcome==0 & Outcome==1]),
+                False_Positive = sum(n[predOutcome==1 & Outcome==0])) %>%
+     gather(Variable, Count) %>%
+     mutate(Revenue =
+               ifelse(Variable == "True_Negative", 0,
+               ifelse(Variable == "True_Positive",((-2850-5000+10000+56000)*(Count*0.25)+(-2850*Count*0.75)),
+               ifelse(Variable == "False_Negative", 0,
+               ifelse(Variable == "False_Positive", -2850 * Count, 0)))),
+            Threshold = x)
+  
+  all_prediction <- rbind(all_prediction, this_prediction)
+  x <- x + .01
+  }
+return(all_prediction)
+}
+```
+
+Based on the cost/benefit analysis, we want to increase the true-positive rate and decrease the False-Positive rate to increase the total benefit for the model.Therefore, we need to find the different threshold's influence on this two indicators. We can find that with the increase of threshold, the True-positive and False Positive will both decrease. 
+
+```{r confusion matrix plot}
+whichThreshold <- iterateThresholds(test_Probs1)
+
+whichThreshold %>%
+  ggplot(.,aes(Threshold, Count, colour = Variable)) +
+  geom_point() +
+  scale_colour_manual(values = palette4) +    
+  labs(title = "Confusion Metric Outcome by Threshold",
+       y = "Count") +
+  guides(colour=guide_legend(title = "Legend")) 
+```
+
+However, it's hard to get the maximium of benefits easily. So we plot the line of benefits with the increasing threshold. We can find the benefit will reach the max when the threshold is set as 0.14 properly.
+
+```{r revenue_model}
+whichThreshold <- iterateThresholds(testProbs2)
+
+whichThreshold_revenue <- 
+whichThreshold %>% 
+    group_by(Threshold) %>% 
+    summarize(Revenue = sum(Revenue))
+
+  ggplot(whichThreshold_revenue)+
+  geom_line(aes(x = Threshold, y = Revenue))+
+  geom_vline(xintercept =  pull(arrange(whichThreshold_revenue, -Revenue)[1,1]))+
+    labs(title = "Model Revenues By Threshold For Test Sample",
+         subtitle = "Vertical Line Denotes Optimal Threshold")
+
+```
+
+However, if we use the counts of credits, which represents the number of homeowners can get the credit to enter the program, to measure the performance of different threshold, we can find that the count of credit will continously increase with the increase of threshold until the threshold comes to 0.8.
+
+```{r credit_model}
+whichThreshold_credit <- 
+whichThreshold %>% 
+  mutate(credit =  ifelse(Variable == "True_Positive", (Count * 0.25),
+                             ifelse(Variable == "False_Negative", Count, 0))) %>%
+  group_by(Threshold) %>% 
+  summarize(Credit = sum(credit))
+
+  ggplot(whichThreshold_credit)+
+  geom_line(aes(x = Threshold, y = Credit, colour = "#FE9900"))+
+  geom_vline(xintercept =  pull(arrange(whichThreshold_credit, -Credit)[1,1]))+
+    labs(title = "Total Count of Credits By Threshold For Test Sample",
+         subtitle = "Vertical Line Denotes Optimal Threshold")+
+  theme(legend.position = "None")
+```
+
+if we compare the revenue and credit number of the optimal benefits' threshold and 0.5 threshold, we can find that despite the benefit will reach max with 0.22 threshold for the model, the model with serve less credit compared to 0.5 threshold.
+
+```{r threshold table}
+threshold_table <- merge(whichThreshold_revenue, whichThreshold_credit, by = "Threshold")
+
+final_table <- threshold_table %>%
+                  slice(22, 50) 
+
+kable(final_table, caption = "Total Revenue and Total Count of Credits for Optimal Threshold and 0.5 Threshold") %>% 
+  kable_styling()
+```
+
+# Conclusion
+In general, I would not recommend this model be put into production. For one thing, the model could have potential bias due to the feature used in the model. The reclassification and consideration of martial, job, and education would lead to potential bias to the vulnerable group in the model production. What's more, the model show the weakness in the reliability due to model's low likelihood. This situation may come from limited features in the dataset. If the model could consider more comprehensive factors that influence the credit of homeowner, the model could have better likelihood performance.
+
+Therefore, to improve the performance of model, we can add more variables in the model to increase the comprehensive consideration. For another, we could also think about the features which could lead to bias more consciously. To ensure that the marketing materials resulted in a better response rate, we could based on the actual situation to switch the threshold of model promptly based on the period feedback from the market.
