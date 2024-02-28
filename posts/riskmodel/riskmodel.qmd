@@ -1,0 +1,563 @@
+---
+title: 'Risk Predictive Modeling'
+author: "Tianxiao Chen"
+date: "10/16/2023"
+categories: [spatial, code, analysis]
+image: "risk.png"
+format:
+  html:
+    code-fold: true
+    code-summary: "Show the code"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+
+library(tidyverse)
+library(sf)
+library(RSocrata)
+library(viridis)
+library(spatstat)
+library(raster)
+library(spdep)
+library(FNN)
+library(grid)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(tidycensus)
+library(classInt)  
+library(mapview)
+# for KDE and ML risk class intervals
+# functions
+root.dir = "https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/DATA/"
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+```
+
+# Data Wrangling
+
+## Choose of Theft Type 
+The reason for choosing theft as the selected bias comes from the strong relationship between theft and poverty. Due to the attribute for crime comes from factors besides peer pressure, poverty, community behavior. Therefore, the assumption of poverty leading potential theft behavior guides my decision in selecting theft, and I also want to figure out the potential physical environment impact on the theft behavior.
+
+```{r laod spatial info,results='hide',message=FALSE}
+policeDistricts <- 
+  st_read("https://data.cityofchicago.org/api/geospatial/fthy-xz3r?method=export&format=GeoJSON") %>%
+  st_transform('ESRI:102271') %>%
+  dplyr::select(District = dist_num)
+  
+policeBeats <- 
+  st_read("https://data.cityofchicago.org/api/geospatial/aerh-rz74?method=export&format=GeoJSON") %>%
+  st_transform('ESRI:102271') %>%
+  dplyr::select(District = beat_num)
+
+bothPoliceUnits <- rbind(mutate(policeDistricts, Legend = "Police Districts"), 
+                         mutate(policeBeats, Legend = "Police Beats"))
+# & Description == 'RETAIL THEFT'
+burglaries <- 
+  read.socrata("https://data.cityofchicago.org/Public-Safety/Crimes-2017/d62x-nvdr") %>% 
+    filter(Primary.Type == "THEFT") %>%
+    mutate(x = gsub("[()]", "", Location)) %>% 
+    separate(x,into= c("Y","X"), sep=",") %>%
+    mutate(X = as.numeric(X),Y = as.numeric(Y)) %>% 
+    na.omit() %>%
+    st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant")%>%
+    st_transform('ESRI:102271') %>% 
+    distinct()
+
+chicagoBoundary <- 
+  st_read(file.path(root.dir,"/Chapter5/chicagoBoundary.geojson")) %>%
+  st_transform('ESRI:102271') 
+```
+
+## Map of Crime Point Data
+When focusing on the spatial distribution, we can find that the whole city have certain amount of crime happened, expect the south part. The density map of crime reveals the high frequency and strong intensity in the east part, especially near the river north district. The situation potentially results from the role of city central and adequate market activities in this area.
+```{r point visualization,fig.width=6, fig.height=4}
+grid.arrange(ncol=2,
+ggplot() + 
+  geom_sf(data = chicagoBoundary) +
+  geom_sf(data = burglaries, colour="#fb8500", size=0.05, show.legend = "point") +
+  labs(title= "Burlaries, Chicago - 2017") + 
+  mapTheme(title_size = 14),
+
+ggplot() + 
+  geom_sf(data = chicagoBoundary, fill = "grey40") +
+  stat_density2d(data = data.frame(st_coordinates(burglaries)), 
+                 aes(X, Y, fill = ..level.., alpha = ..level..),
+                 size = 0.01, bins = 1500, geom = 'polygon') +
+  scale_fill_viridis() +
+  scale_alpha(range = c(0.00, 0.35), guide = FALSE) +
+  labs(title = "Density of Burglaries") +
+  mapTheme(title_size = 14) + theme(legend.position = "none"))
+```
+
+```{r create fishnet}
+fishnet <- 
+  st_make_grid(chicagoBoundary,
+               cellsize = 500, 
+               square = FALSE) %>%
+  .[chicagoBoundary] %>%
+  st_sf() %>%
+  mutate(uniqueID = 1:n())
+```
+
+## map for the crime count in the fishnet
+When we use fishnet to calculate the amount of theft behavior in the 500 inch grid, we can find the distributional features concentrated in the east matches the theft crime density map.
+```{r count fishnet crime number}
+crime_net <- 
+  dplyr::select(burglaries) %>% 
+  mutate(countBurglaries = 1) %>% 
+  aggregate(., fishnet, sum) %>%
+  mutate(countBurglaries = replace_na(countBurglaries, 0),
+         uniqueID = 1:n(),
+         cvID = sample(round(nrow(fishnet) / 24), 
+                       size=nrow(fishnet), replace = TRUE))
+
+ggplot() +
+  geom_sf(data = crime_net, aes(fill = countBurglaries), color = NA) +
+  scale_fill_viridis(option = 'B') +
+  labs(title = "Count of Burglaires for the fishnet") +
+  mapTheme()
+# For demo. requires updated mapview package
+# xx <- mapview::mapview(crime_net, zcol = "countBurglaries")
+# yy <- mapview::mapview(mutate(burglaries, ID = seq(1:n())))
+# xx + yy
+```
+
+## Variable Selection
+To make location prediction of theft, we try to figure out related spatial feature. Just shown in the 'Broken Window' effect, the place in bad management situation has more potential to confront worse security situation, which leads to higher possibility of theft. Therefore, we select the vacant house reported, garbage cart report, and abandoned cars 311 request data as the potential supporting spatial features of the location feature of theft.
+
+*[311 Service Requests - Abandoned Vehicles](https://data.cityofchicago.org/Service-Requests/311-Service-Requests-Abandoned-Vehicles-Historical/3c9v-pnva) The dataset records all open abandoned vehicle complaints made to 311 and all requests completed since January 1, 2011. A vehicle can be classified as abandoned if it meets one or more of the following criteria. The abandoned car illustrates the street vitality in some ways.
+
+*[311 Service Requests - Vacant and Abandoned Buildings Reported](https://data.cityofchicago.org/Service-Requests/311-Service-Requests-Vacant-and-Abandoned-Building/7nii-7srd) The dataset records all 311 calls for open and vacant buildings reported to the City of Chicago since January 1, 2010. 
+
+*[311 Service Requests - Garbage Carts](https://data.cityofchicago.org/Service-Requests/311-Service-Requests-Garbage-Carts-Historical/9ksk-na4q) The dataset records all open garbage cart requests made to 311 and all requests completed since January 1, 2011. The request for Garbage carts shows the demand for street clean in the surrounding street, which potentially reveals the citizen's attention to the quality of life.
+
+```{r laod dependent variable,results='hide',message=FALSE}
+abhh <- read.csv('/Users/mr.smile/Desktop/UPENN/FALL23/MUSA508/musa_5080_2023-main/RiskModel/data/311_Service_Requests_-_Vacant_and_Abandoned_Buildings_Reported_-_Historical_20231015.csv')%>%
+  mutate(year = substr(DATE.SERVICE.REQUEST.WAS.RECEIVED,7,10))%>%
+  filter(year == '2017')%>%
+  dplyr::select(Y=LATITUDE,X=LONGITUDE)%>%
+  na.omit()%>%
+  st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+  st_transform(st_crs(fishnet)) %>%
+  mutate(Legend = "abondoned_house")
+
+garbg <- 
+  read.socrata("https://data.cityofchicago.org/Service-Requests/311-Service-Requests-Garbage-Carts-Historical/9ksk-na4q") %>%
+    mutate(year = substr(creation_date,1,4)) %>% filter(year == "2017") %>%
+    dplyr::select(Y = latitude, X = longitude) %>%
+    na.omit() %>%
+    st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+    st_transform(st_crs(fishnet)) %>%
+    mutate(Legend = "Garbage")
+
+abandonCars <- 
+  read.socrata("https://data.cityofchicago.org/Service-Requests/311-Service-Requests-Abandoned-Vehicles/3c9v-pnva") %>%
+    mutate(year = substr(creation_date,1,4)) %>% filter(year == "2017") %>%
+    dplyr::select(Y = latitude, X = longitude) %>%
+    na.omit() %>%
+    st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+    st_transform(st_crs(fishnet)) %>%
+    mutate(Legend = "Abandoned_Cars")
+
+ftr_union <- rbind(mutate(abandonCars, Legend = "Abandoned_Cars"), 
+                         mutate(abhh, Legend = "abondoned_house"))%>%
+  rbind(mutate(garbg, Legend = "Garbage"))
+
+neighborhoods <- 
+  st_read("https://raw.githubusercontent.com/blackmad/neighborhoods/master/chicago.geojson") %>%
+  st_transform(st_crs(fishnet)) 
+```
+
+```{r count feature in fishnet,results='hide',message=FALSE}
+vars_net <- ftr_union %>%
+  st_join(fishnet, join=st_within) %>%
+  st_drop_geometry() %>%
+  group_by(uniqueID, Legend) %>%
+  summarize(count = n()) %>%
+  left_join(fishnet, ., by = "uniqueID") %>%
+  spread(Legend, count, fill=0) %>%
+  dplyr::select(-`<NA>`) %>%
+  ungroup()
+```
+
+```{r knn calculation}
+st_c    <- st_coordinates
+st_coid <- st_centroid
+
+vars_net <- vars_net %>%
+    mutate(Abandoned_Cars.nn = nn_function(st_c(st_coid(vars_net)), 
+                                           st_c(abandonCars),
+                                           k = 1))%>%
+    mutate(Vancant.nn = nn_function(st_c(st_coid(vars_net)), 
+                                           st_c(abhh),
+                                           k = 1))%>%
+    mutate(Garbage.nn = nn_function(st_c(st_coid(vars_net)), 
+                                           st_c(garbg),
+                                           k = 1))
+```
+
+## map for rist factors
+When we focus on the distance to the nearest 311 report in the city grid, we can find that the abandoned cars and garbage carts request reveals the similar situation that the south part  generally have a longer distance to the closest report. When we focus on the distance to nearest Vacancy report, the area around city boundary generally has a longer distance.
+```{r knn visualization,results='hide',message=FALSE}
+## Visualize the NN feature
+vars_net.long.nn <- 
+  dplyr::select(vars_net, ends_with(".nn")) %>%
+    gather(Variable, value, -geometry)
+
+ggplot() +
+      geom_sf(data = vars_net.long.nn, aes(fill=value), colour=NA) +
+      scale_fill_viridis(name="NN Distance") +
+      facet_wrap(~Variable)+
+      mapTheme()
+```
+
+```{r join united variable}
+final_net <-
+  left_join(crime_net, st_drop_geometry(vars_net), by="uniqueID")%>%
+  mutate(tt_count = 0.2*Abandoned_Cars + 0.6*abondoned_house + 0.2*Garbage)
+
+final_net <-
+  st_centroid(final_net) %>%
+    st_join(dplyr::select(neighborhoods, name), by = "uniqueID") %>%
+    st_join(dplyr::select(policeDistricts, District), by = "uniqueID") %>%
+      st_drop_geometry() %>%
+      left_join(dplyr::select(final_net, geometry, uniqueID)) %>%
+      st_sf() %>%
+  na.omit()
+mapview::mapview(final_net, zcol = "Garbage")
+```
+
+# Data Analysis
+
+## Local Moran's I 
+Due to several variables taken into consideration, we try to make the considerate variable that both include the vacancy, abandoned vehicle, and garbage cart.I use weighted assignment method to combine the number of these variables as a index to calculate the comprehensive report situation.
+
+When we use Local Moran's I test to assess the spatial autocorrelation, we can find that the the north-middle and south-middle part have a obvious higher autocorrelation, which show that locations that are close to each other tend to have similar or dissimilar attribute values. The low P-value in these area shows that the observed data is unlikely to have occurred by random chance alone. Therefore, we can assume that except these two area, this variable is statistically significant and is not exhibiting a significant spatial pattern or spatial dependence. And the further modeling in this two areas should be cautious with clustering pattern.
+```{r moran analysis}
+final_net.nb <- poly2nb(as_Spatial(final_net), queen=TRUE)
+final_net.weights <- nb2listw(final_net.nb, style="W", zero.policy=TRUE)
+
+local_morans <- localmoran(final_net$tt_count, final_net.weights, zero.policy=TRUE) %>% 
+  as.data.frame()
+
+final_net.localMorans <- 
+  cbind(local_morans, as.data.frame(final_net)) %>% 
+  st_sf() %>%
+  dplyr::select(Count = tt_count, 
+                Local_Morans_I = Ii, 
+                P_Value = `Pr(z != E(Ii))`) %>%
+  mutate(Significant_Hotspots = ifelse(P_Value <= 0.001, 1, 0)) %>%
+  gather(Variable, Value, -geometry)
+```
+
+```{r moran visualization}
+vars <- unique(final_net.localMorans$Variable)
+varList <- list()
+for(i in vars){
+  varList[[i]] <- 
+    ggplot() +
+      geom_sf(data = filter(final_net.localMorans, Variable == i), 
+              aes(fill = Value), colour=NA) +
+      scale_fill_viridis(name="") +
+      labs(title=i) +
+      mapTheme(title_size = 14) + theme(legend.position="bottom")}
+do.call(grid.arrange,c(varList, ncol = 4, top = "Local Morans I statistics, Theft"))
+```
+
+## correlation scatterplot
+When we look at the scatterplots of the variables to the theft crime count, we can find that these variables both reveals the impact on the count of theft. the nearest distance of abandoned cars and number of garbage request illustrates the negative correlation to the count of theft. The number of abandoned house report in the grid shows a positive correlation to the number of theft. The trend matches our assumption that the area with lower attention on the street and more serious vacancy situation represents less security and more potential theft behavior.
+```{r Correlation scatterplot,fig.width=10, fig.height=6,results='hide',warning=FALSE}
+## Home Features cor
+st_drop_geometry(final_net) %>% 
+  dplyr::select(countBurglaries, Abandoned_Cars.nn, Garbage.nn, abondoned_house) %>%
+  filter(countBurglaries <= 200)%>%
+  gather(Variable, Value, -countBurglaries) %>% 
+   ggplot(aes(Value, countBurglaries)) +
+     geom_point(size = .5) + geom_smooth(method = "lm", se=T, colour = "#FA7800") +
+     facet_wrap(~Variable, ncol = 3, scales = "free") +
+     labs(title = "3 varialbes' correlation to Burglaries") +
+     plotTheme()
+```
+
+## Histogram of dependent variable
+Also, the histogram of number of theft reveal nearly skewed normal distribution, which could potentially impact model's parameter estimates, assumptions, and predictive accuracy. 
+```{r histogram for categorical variables, fig.height=6, fig.width=8,warning=FALSE}
+crime_his <- ggplot(final_net, aes(x = countBurglaries)) +
+  geom_histogram(binwidth = 1, fill = "grey", color = "black") +
+  labs(title = "count of theft", x = "Count", y = "Frequency")
+crime_his
+```
+
+Then, we use score of Local Moran's I as the judge of spatial dependence to check the 'degree of reliance' for the variable. we figure out the point with low p-value is statistically significant. And we calculate the distance to the nearest reliant point. We can find that the north and south part have a higher distance to closest reliant point, which means that the the variable is statistically significant in the Chicago in general.
+```{r distance to high-related region}
+# generates warning from NN
+final_net <- final_net %>% 
+  mutate(abandoned.isSig = 
+           ifelse(local_morans[,5] <= 0.01, 1, 0)) %>%
+  mutate(abandoned.isSig.dist = 
+           nn_function(st_c(st_coid(final_net)),
+                       st_c(st_coid(filter(final_net, 
+                                           abandoned.isSig == 1))), 
+                       k = 1))
+## What does k = 1 represent?
+ggplot() +
+      geom_sf(data = final_net, aes(fill=abandoned.isSig.dist), colour=NA) +
+      scale_fill_viridis(name="NN Distance") +
+      labs(title="Abandoned Car NN Distance") +
+      mapTheme()
+```
+
+# Data Modeling
+
+## Model Based on Spatial Feature
+After the analysis above, we select these variable as the model's independent variables and use cross validation to get the optimal model. And the distribution of Mean Absolute Error (MAE) shows that the main district in the city is well predicted. 
+```{r spatial modeling,results='hide',message=FALSE}
+reg.ss.vars <- c('Abandoned_Cars','abondoned_house','Garbage',"Abandoned_Cars.nn", 'Vancant.nn','Garbage.nn',"abandoned.isSig.dist")
+
+reg.ss.spatialCV <- crossValidate(
+  dataset = final_net,
+  id = "name",                           
+  dependentVariable = "countBurglaries",
+  indVariables = reg.ss.vars) %>%
+    dplyr::select(cvID = name, countBurglaries, Prediction, geometry)
+
+error_by_reg_and_fold <- 
+  reg.ss.spatialCV %>%
+    group_by(cvID) %>% 
+    summarize(Mean_Error = mean(Prediction - countBurglaries, na.rm = T),
+              MAE = mean(abs(Mean_Error), na.rm = T),
+              Count_NA = sum(is.na(Mean_Error))) %>%
+  ungroup()%>%
+  mutate(SD_MAE = ifelse(Count_NA == 0, sd(abs(Mean_Error)), NA))
+
+error_by_reg_and_fold %>% 
+  arrange(desc(MAE))
+error_by_reg_and_fold %>% 
+  arrange(MAE)
+
+## plot histogram of OOF (out of fold) errors
+error_by_reg_and_fold %>%
+  ggplot(aes(MAE)) + 
+    geom_histogram(bins = 30, colour="black", fill = "#FDE725FF") +
+  scale_x_continuous(breaks = seq(0, 11, by = 1)) + 
+    labs(title="Distribution of MAE", subtitle = "LOGO-CV",
+         x="Mean Absolute Error", y="Count") 
+```
+
+### map for the model error
+When we visualize the geospatial situation of error, we can find that the east part, close to the River North, have a higher error, which represents the prediction in this area should be taken into consideration about inaccuracy.
+```{r error visualization}
+grid.arrange(
+  ggplot() +
+  geom_sf(data = error_by_reg_and_fold, aes(fill = MAE), color = NA) +
+  scale_fill_viridis() +
+  labs(title = "MAE situation") +
+  mapTheme(),
+  ggplot() +
+  geom_sf(data = error_by_reg_and_fold, aes(fill = Mean_Error), color = NA) +
+  scale_fill_viridis() +
+  labs(title = "Mean Error situaion") +
+  mapTheme(),
+  ncol = 2)
+```
+
+### table of MAE & SD_MAE
+```{r MAE table for spatial feature}
+error_by_reg_and_fold %>%
+   st_drop_geometry() %>%
+  summarise(MAE = mean(MAE),
+            SD_MAE = mean(SD_MAE)) %>%
+  kbl(col.name=c('Mean Absolute Error','Sd of Mean Absolute Error')) %>%
+  kable_classic()
+```
+
+## Race Model Comparison 
+Also, we want to figure out if race variable would play an important role in the count of theft. we use the percentage of white as the variable. We can find that the north part have a higher percentage of white, compared to the south part.
+```{r add race variable,results='hide',message=FALSE}
+tracts17 <- 
+  get_acs(geography = "tract", variables = c("B01001_001E","B01001A_001E"), 
+          year = 2017, state='IL', county='Cook', geometry=T, output = "wide") %>%
+  st_transform('ESRI:102728')  %>%
+  rename(TotalPop = B01001_001E,
+         NumberWhites = B01001A_001E) %>%
+  mutate(percentWhite = NumberWhites / TotalPop,
+         raceContext = ifelse(percentWhite > .5, "Majority White", "Majority Non-White"))%>%
+  st_transform('ESRI:102271') %>% 
+  .[chicagoBoundary,]
+
+race_net <- st_join(st_centroid(fishnet),tracts17,join=st_within)%>%
+  dplyr::select(uniqueID,percentWhite)
+
+final_net <- left_join(final_net,st_drop_geometry(race_net),by = 'uniqueID')
+
+ggplot() + geom_sf(data = na.omit(tracts17), aes(fill = percentWhite)) +
+    scale_fill_viridis() +
+    labs(title = "Race Context") +
+    mapTheme() + theme(legend.position="bottom")
+```
+
+```{r race modeling,results='hide'}
+## RUN REGRESSIONS
+reg.ss.race <- crossValidate(
+  dataset = final_net,
+  id = "name",                           
+  dependentVariable = "countBurglaries",
+  indVariables = c('Abandoned_Cars','abondoned_house','Garbage',"Abandoned_Cars.nn", 'Vancant.nn','Garbage.nn',"abandoned.isSig.dist",'percentWhite')) %>%
+    dplyr::select(cvID = name, countBurglaries, Prediction, geometry)
+
+error_by_race <- 
+  reg.ss.race %>%
+    group_by(cvID) %>% 
+    summarize(Mean_Error = mean(Prediction - countBurglaries, na.rm = T),
+              MAE = mean(abs(Mean_Error), na.rm = T),
+              Count_NA = sum(is.na(Mean_Error))) %>%
+  ungroup()%>%
+  mutate(SD_MAE = ifelse(Count_NA == 0, sd(abs(Mean_Error)), NA))
+
+error_by_race %>% 
+  arrange(desc(MAE))
+error_by_race %>% 
+  arrange(MAE)
+## plot histogram of OOF (out of fold) errors
+#error_by_race %>%
+#  ggplot(aes(MAE)) + 
+#    geom_histogram(bins = 30, colour="black", fill = "#FDE725FF") +
+#  scale_x_continuous(breaks = seq(0, 11, by = 1)) + 
+#    labs(title="Distribution of MAE", subtitle = "LOGO-CV",
+#         x="Mean Absolute Error", y="Count") 
+```
+
+### comaprison of race error and spatial error
+When we compared the basic model and a new one adding the percent of white, we can find that the basic model have a both lower MAE and standard deviation of MAE. The result represent MAE made by the basic model are relatively consistent and close to the mean error, and the reuslt of this model is more convincing.
+```{r two model comapre}
+tt_error <- rbind(mutate(error_by_reg_and_fold,Legend='Spatial'),
+                  mutate(error_by_race,Legend = 'Race'))
+tt_error_smry<- tt_error %>%
+   st_drop_geometry() %>%
+  group_by(Legend)%>%
+  summarise(MAE = mean(MAE),
+            SD_MAE = mean(SD_MAE))
+kable(tt_error_smry, caption = "Error Comparison of Race and Spatial Feature", format = "html")
+```
+
+## Kernel Density Comparison
+
+### map of comparison of Kernel Density and Risk Prediction
+We also use Kernel Density to estimate the probability density function of number of theft. The Kernel Density has a strong performance in the general trend illustration. We want to figure out if the crime prediction in the model reveals the similar trend as the Density map reveal and the modeling based on Kernel Density of crime.
+
+When We compared the level of risk based on the number of theft resulted from Kernel Density and model relying on the spatial feature, we can obviously find that the prediction based on Kernel Density show the Circular distribution of risk degree, centering the east part where have high theft frequency. 
+
+The risk prediction based on the spatial feature reveals a more decentralized distribution with the east part as the peak risk degree. the Model shows highlights the potential higher risk degree in the noth and middle-south part, compared to the Kernel Density one.
+```{r kernel den visulization}
+# demo of kernel width
+burg_ppp <- as.ppp(st_coordinates(burglaries), W = st_bbox(final_net))
+burg_KD.1000 <- spatstat.explore::density.ppp(burg_ppp, 1000)
+burg_KD.1500 <- spatstat.explore::density.ppp(burg_ppp, 1500)
+burg_KD.2000 <- spatstat.explore::density.ppp(burg_ppp, 2000)
+burg_KD.df <- rbind(
+  mutate(data.frame(rasterToPoints(mask(raster(burg_KD.1000), as(neighborhoods, 'Spatial')))), Legend = "1000 Ft."),
+  mutate(data.frame(rasterToPoints(mask(raster(burg_KD.1500), as(neighborhoods, 'Spatial')))), Legend = "1500 Ft."),
+  mutate(data.frame(rasterToPoints(mask(raster(burg_KD.2000), as(neighborhoods, 'Spatial')))), Legend = "2000 Ft.")) 
+
+burg_KD.df$Legend <- factor(burg_KD.df$Legend, levels = c("1000 Ft.", "1500 Ft.", "2000 Ft."))
+```
+
+```{r load new crime data}
+# Description == "RETAIL THEFT"
+burglaries18 <- 
+  read.socrata("https://data.cityofchicago.org/Public-Safety/Crimes-2018/3i3m-jwuy") %>% 
+  filter(Primary.Type == "THEFT" ) %>%
+  mutate(x = gsub("[()]", "", Location)) %>%
+  separate(x,into= c("Y","X"), sep=",") %>%
+  mutate(X = as.numeric(X),
+         Y = as.numeric(Y)) %>% 
+  na.omit %>%
+  st_as_sf(coords = c("X", "Y"), crs = 4326, agr = "constant") %>%
+  st_transform('ESRI:102271') %>% 
+  distinct() %>%
+  .[fishnet,]
+```
+
+```{r kernel density one}
+burg_KDE_sum <- as.data.frame(burg_KD.1000) %>%
+  st_as_sf(coords = c("x", "y"), crs = st_crs(final_net)) %>%
+  aggregate(., final_net, mean) 
+kde_breaks <- classIntervals(burg_KDE_sum$value, 
+                             n = 5, "fisher")
+burg_KDE_sf <- burg_KDE_sum %>%
+  mutate(label = "Kernel Density",
+         Risk_Category = classInt::findCols(kde_breaks),
+         Risk_Category = case_when(
+           Risk_Category == 5 ~ "5th",
+           Risk_Category == 4 ~ "4th",
+           Risk_Category == 3 ~ "3rd",
+           Risk_Category == 2 ~ "2nd",
+           Risk_Category == 1 ~ "1st")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(burglaries18) %>% mutate(burgCount = 1), ., sum) %>%
+    mutate(burgCount = replace_na(burgCount, 0))) %>%
+  dplyr::select(label, Risk_Category, burgCount)
+```
+
+```{r predict one}
+ml_breaks <- classIntervals(reg.ss.spatialCV$Prediction, 
+                             n = 5, "fisher")
+burg_risk_sf <-
+  reg.ss.spatialCV %>%
+  mutate(label = "Risk Predictions",
+         Risk_Category =classInt::findCols(ml_breaks),
+         Risk_Category = case_when(
+           Risk_Category == 5 ~ "5th",
+           Risk_Category == 4 ~ "4th",
+           Risk_Category == 3 ~ "3rd",
+           Risk_Category == 2 ~ "2nd",
+           Risk_Category == 1 ~ "1st")) %>%
+  cbind(
+    aggregate(
+      dplyr::select(burglaries18) %>% mutate(burgCount = 1), ., sum) %>%
+      mutate(burgCount = replace_na(burgCount, 0))) %>%
+  dplyr::select(label,Risk_Category, burgCount)
+```
+
+```{r map comaprasion}
+rbind(burg_KDE_sf, burg_risk_sf) %>%
+  na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category, -geometry) %>%
+  ggplot() +
+    geom_sf(aes(fill = Risk_Category), colour = NA) +
+    geom_sf(data = sample_n(burglaries18, 3000), size = .3, colour = "black",alpha=0.4) +
+    facet_wrap(~label, ) +
+    scale_fill_viridis(discrete = TRUE) +
+    labs(title="Comparison of Kernel Density and Risk Predictions",
+         subtitle="2017 burglar risk predictions; 2018 burglaries") +
+    mapTheme(title_size = 14)
+```
+
+### The bar plot make comparison
+The bar plot compare the percentage of different risk degree of the model prediction and Kernel Density. We can find that with slightly lower percentage of the most risk region than Kernel Density, The risk prediction have a relatively higher percentage in the third degree of risk region. The result reveals that the model indicates Chicago have more places is more dangerous, which seems be away from the place with high theft frequency.
+```{r bar plot comparison,results='hide',message=FALSE}
+rbind(burg_KDE_sf, burg_risk_sf) %>%
+  st_drop_geometry() %>%
+  na.omit() %>%
+  gather(Variable, Value, -label, -Risk_Category) %>%
+  group_by(label, Risk_Category) %>%
+  summarize(countBurglaries = sum(Value)) %>%
+  ungroup() %>%
+  group_by(label) %>%
+  mutate(Pcnt_of_test_set_crimes = countBurglaries / sum(countBurglaries)) %>%
+    ggplot(aes(Risk_Category,Pcnt_of_test_set_crimes)) +
+      geom_bar(aes(fill=label), position="dodge", stat="identity") +
+      scale_fill_viridis(discrete = TRUE, name = "Model") +
+      labs(title = "Risk prediction vs. Kernel density, 2018 burglaries",
+           y = "% of Test Set Burglaries (per model)",
+           x = "Risk Category") +
+  theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+```
+
+# Conclusion
+In general, I will recommend to put the model into production. The model has a relative low MAE and standard deviation of MAE, which means that the model is trustworthy in the performance of prediction. Also, the model reveals the invisible risk situation beyond the Kernel Density, especially in Chicago's north-middle and south-middle part. For another, the model includes several spatial-relevant variables, and have a good interpretation in the variables' behavior to provide feedback on the improvement of physical environment to improve the situation of theft.
+
+However, the model also has some potential drawbacks to consider. For one thing, the main differentiated place in risk degree also match the place where the variable has spatial autocorrelation, which weaken the convince of the conclusion. For another, the distribution of crime count based on fishnet is also close to skewed normal distribution, which contradicts the basic assumption of OLS, the algorithm used in the model. Therefore, perhaps we need to process the count of theft in another way or find another algorithm to better fit this situation.
